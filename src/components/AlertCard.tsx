@@ -1,4 +1,4 @@
-import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
@@ -52,6 +52,14 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
 
+  const openGPSNavigation = () => {
+    if (intervention.location) {
+      const encodedAddress = encodeURIComponent(intervention.location);
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+    }
+  };
+  
+
   return (
     <div 
       className={cn(
@@ -89,11 +97,14 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
         </p>
       )}
 
-      {/* Location */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <MapPin className="w-4 h-4 text-primary" />
-        <span className="truncate">{intervention.location}</span>
-      </div>
+      {/* Location with GPS Button */}
+      <button 
+        onClick={openGPSNavigation}
+        className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 mb-4 w-full text-left transition-colors group"
+      >
+        <Navigation className="w-4 h-4 shrink-0 group-hover:scale-110 transition-transform" />
+        <span className="truncate underline underline-offset-2">{intervention.location}</span>
+      </button>
 
       {/* Action Buttons */}
       {isResponded ? (
