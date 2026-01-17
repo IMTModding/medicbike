@@ -41,38 +41,68 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    const { title, body, urgency, interventionId } = await req.json();
+    const { title, body, urgency, interventionId, type, organizationId, excludeUserId } = await req.json();
     
-    console.log('Sending push notification:', { title, urgency, interventionId });
+    console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId });
 
-    // Get all push subscriptions
-    const { data: subscriptions, error: subError } = await supabase
+    let subscriptionsQuery = supabase
       .from('push_subscriptions')
-      .select('*');
+      .select('*, profiles!inner(invite_code_id, admin_id, user_id)');
+    
+    // For chat notifications, only notify users in the same organization
+    if (type === 'chat' && organizationId) {
+      // Get users in this organization (employees with this invite_code_id or admin who created it)
+      const { data: orgProfiles } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
+      
+      const userIds = (orgProfiles || []).map(p => p.user_id).filter(id => id !== excludeUserId);
+      
+      if (userIds.length === 0) {
+        return new Response(
+          JSON.stringify({ message: 'No users to notify', total: 0, successful: 0 }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      subscriptionsQuery = supabase
+        .from('push_subscriptions')
+        .select('*')
+        .in('user_id', userIds);
+    }
+
+    const { data: subscriptions, error: subError } = await subscriptionsQuery;
 
     if (subError) {
       console.error('Error fetching subscriptions:', subError);
       throw subError;
     }
 
-    console.log(`Found ${subscriptions?.length || 0} subscriptions`);
+    // Filter out the sender for chat messages
+    const filteredSubscriptions = excludeUserId 
+      ? (subscriptions || []).filter(s => s.user_id !== excludeUserId)
+      : subscriptions;
+
+    console.log(`Found ${filteredSubscriptions?.length || 0} subscriptions to notify`);
 
     const payload = JSON.stringify({
       title,
       body,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: interventionId,
+      tag: type === 'chat' ? `chat-${organizationId}` : interventionId,
       data: {
         interventionId,
         urgency,
-        url: '/',
+        type,
+        url: type === 'chat' ? '/general-chat' : '/',
       },
     });
 
     // Send to all subscriptions using simple fetch
     const results = await Promise.allSettled(
-      (subscriptions || []).map(async (sub) => {
+      (filteredSubscriptions || []).map(async (sub) => {
         try {
           console.log('Sending to endpoint:', sub.endpoint.substring(0, 60));
           
