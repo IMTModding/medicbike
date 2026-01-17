@@ -41,7 +41,13 @@ export const NotificationToggle = () => {
           toast.success('Notifications activées !');
           setPermission('granted');
         } else {
-          toast.error('Impossible d\'activer les notifications');
+          // If the user granted permission but we still failed, it's usually setup/config.
+          const current = getNotificationPermission();
+          if (current === 'granted') {
+            toast.error("Notifications non configurées sur cet appareil (clé VAPID manquante ou navigateur incompatible)");
+          } else {
+            toast.error("Impossible d'activer les notifications");
+          }
         }
       }
     } catch (error) {
