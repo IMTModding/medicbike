@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { sendChatNotification } from '@/services/pushNotifications';
 import { Send, MessageCircle, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -35,6 +36,7 @@ const GeneralChatPage = () => {
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
+  const [currentUserName, setCurrentUserName] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +49,17 @@ const GeneralChatPage = () => {
   useEffect(() => {
     const fetchOrganization = async () => {
       if (!user) return;
+
+      // Get current user's name
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (profileData?.full_name) {
+        setCurrentUserName(profileData.full_name);
+      }
 
       if (isAdmin) {
         // Admin: get first invite code they created
@@ -165,21 +178,30 @@ const GeneralChatPage = () => {
     
     if (!newMessage.trim() || !user || !organizationId) return;
 
+    const messageToSend = newMessage.trim();
     setSending(true);
+    setNewMessage('');
 
     const { error } = await supabase
       .from('general_messages')
       .insert({
         user_id: user.id,
-        message: newMessage.trim(),
+        message: messageToSend,
         organization_id: organizationId,
       });
 
     if (error) {
       console.error('Error sending message:', error);
       toast.error('Erreur lors de l\'envoi');
+      setNewMessage(messageToSend); // Restore message on error
     } else {
-      setNewMessage('');
+      // Send push notification to other users in the organization
+      sendChatNotification(
+        currentUserName || 'Nouveau message',
+        messageToSend,
+        organizationId,
+        user.id
+      );
     }
 
     setSending(false);

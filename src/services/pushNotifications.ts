@@ -164,3 +164,33 @@ export const sendPushNotification = async (
     return false;
   }
 };
+
+export const sendChatNotification = async (
+  senderName: string,
+  message: string,
+  organizationId: string,
+  excludeUserId: string
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase.functions.invoke('send-push-notification', {
+      body: { 
+        title: `💬 ${senderName}`,
+        body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+        type: 'chat',
+        organizationId,
+        excludeUserId,
+      },
+    });
+
+    if (error) {
+      console.error('Error sending chat notification:', error);
+      return false;
+    }
+
+    console.log('Chat notification sent');
+    return true;
+  } catch (error) {
+    console.error('Error sending chat notification:', error);
+    return false;
+  }
+};
