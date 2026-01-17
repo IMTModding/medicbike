@@ -37,6 +37,7 @@ interface Intervention {
   status: string;
   created_at: string;
   completed_at: string | null;
+  created_by: string | null;
   intervention_responses: InterventionResponse[];
 }
 
@@ -212,9 +213,105 @@ serve(async (req: Request): Promise<Response> => {
     console.log("Export history request received");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    // ========== AUTHENTICATION CHECK ==========
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Authentification requise" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Create a client with the user's token to verify authentication
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("Authentication failed:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Authentification invalide" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
+
+    // ========== AUTHORIZATION CHECK - Admin Only ==========
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleError) {
+      console.error("Error checking role:", roleError.message);
+      return new Response(
+        JSON.stringify({ error: "Erreur de vérification des permissions" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!roleData) {
+      console.error("User is not an admin");
+      return new Response(
+        JSON.stringify({ error: "Accès non autorisé. Seuls les administrateurs peuvent exporter l'historique." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("User is admin, proceeding with export");
+
+    // ========== GET ADMIN'S ORGANIZATION INFO ==========
+    const { data: adminProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error getting admin profile:", profileError.message);
+    }
+
+    // Get all invite codes created by this admin
+    const { data: adminInviteCodes, error: inviteError } = await supabase
+      .from("invite_codes")
+      .select("id")
+      .eq("admin_id", user.id);
+
+    if (inviteError) {
+      console.error("Error getting admin invite codes:", inviteError.message);
+    }
+
+    const inviteCodeIds = adminInviteCodes?.map(ic => ic.id) || [];
+
+    // Get all users in admin's organization (employees who used admin's invite codes)
+    const { data: orgUsers, error: orgError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .or(`admin_id.eq.${user.id}${inviteCodeIds.length > 0 ? `,invite_code_id.in.(${inviteCodeIds.join(",")})` : ""}`);
+
+    if (orgError) {
+      console.error("Error getting org users:", orgError.message);
+    }
+
+    // List of user IDs in this admin's organization (including the admin)
+    const orgUserIds = [...new Set([user.id, ...(orgUsers?.map(u => u.user_id) || [])])];
+
+    console.log(`Admin organization has ${orgUserIds.length} users`);
+
+    // ========== PROCESS REQUEST ==========
     const { email, format, startDate, endDate }: ExportRequest = await req.json();
     console.log(`Exporting ${format} to ${email}, dates: ${startDate} - ${endDate}`);
 
@@ -225,7 +322,16 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Fetch completed interventions with responses
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "Format d'email invalide" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ========== FETCH INTERVENTIONS - ONLY FROM ADMIN'S ORGANIZATION ==========
     let query = supabase
       .from('interventions')
       .select(`
@@ -238,6 +344,7 @@ serve(async (req: Request): Promise<Response> => {
         )
       `)
       .eq('status', 'completed')
+      .in('created_by', orgUserIds) // Only interventions created by users in this organization
       .order('completed_at', { ascending: false });
 
     if (startDate) {
@@ -256,7 +363,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error(`Erreur de récupération: ${fetchError.message}`);
     }
 
-    console.log(`Found ${interventions?.length || 0} interventions`);
+    console.log(`Found ${interventions?.length || 0} interventions for this organization`);
 
     const typedInterventions = (interventions || []) as unknown as Intervention[];
 
