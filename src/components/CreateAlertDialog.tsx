@@ -6,12 +6,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, AlertTriangle } from 'lucide-react';
 import { createIntervention, Urgency } from '@/services/interventions';
+import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface CreateAlertDialogProps {
   onCreated: () => void;
 }
+
+const urgencyLabels: Record<Urgency, string> = {
+  high: 'Urgent',
+  medium: 'Moyen',
+  low: 'Normal',
+};
 
 export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -42,11 +49,24 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
         created_by: user.id,
       });
       
-      toast.success('Alerte créée avec succès !');
+      // Send push notification to all employees
+      const notifTitle = urgency === 'high' 
+        ? `🚨 URGENT: ${title.trim()}`
+        : `📢 ${title.trim()}`;
+      
+      await sendPushNotification(
+        notifTitle,
+        `📍 ${location.trim()}`,
+        urgency,
+        crypto.randomUUID()
+      );
+      
+      toast.success('Alerte créée et notifications envoyées !');
       setOpen(false);
       resetForm();
       onCreated();
     } catch (error) {
+      console.error('Error creating intervention:', error);
       toast.error("Erreur lors de la création de l'alerte");
     } finally {
       setLoading(false);
