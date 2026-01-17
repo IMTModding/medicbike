@@ -52,10 +52,17 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
 
-  const openGPSNavigation = () => {
+  const openGoogleMaps = () => {
     if (intervention.location) {
       const encodedAddress = encodeURIComponent(intervention.location);
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+    }
+  };
+
+  const openWaze = () => {
+    if (intervention.location) {
+      const encodedAddress = encodeURIComponent(intervention.location);
+      window.open(`https://waze.com/ul?navigate=yes&q=${encodedAddress}`, '_blank');
     }
   };
   
@@ -103,15 +110,26 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
           <MapPin className="w-4 h-4 text-primary shrink-0" />
           <span className="truncate">{intervention.location}</span>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={openGPSNavigation}
-          className="w-full text-blue-400 border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300"
-        >
-          <Navigation className="w-4 h-4 mr-2" />
-          Ouvrir le trajet GPS
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openGoogleMaps}
+            className="flex-1 text-blue-400 border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300"
+          >
+            <Navigation className="w-4 h-4 mr-1" />
+            Google Maps
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openWaze}
+            className="flex-1 text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/20 hover:text-cyan-300"
+          >
+            <Navigation className="w-4 h-4 mr-1" />
+            Waze
+          </Button>
+        </div>
       </div>
 
       {/* Action Buttons */}
