@@ -20,9 +20,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
-        name: 'Gestion des Interventions',
-        short_name: 'Interventions',
-        description: 'Application de gestion des interventions d\'urgence',
+        name: 'MEDICBIKE',
+        short_name: 'MEDICBIKE',
+        description: 'Application de gestion des interventions pour motos médicalisées',
         theme_color: '#f97316',
         background_color: '#1a1a2e',
         display: 'standalone',
