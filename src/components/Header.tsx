@@ -1,4 +1,4 @@
-import { Bell, LogOut, LayoutDashboard, History, MapPin, BarChart3, Calendar, User, KeyRound, Users } from 'lucide-react';
+import { Bell, LogOut, LayoutDashboard, History, MapPin, BarChart3, Calendar, User, KeyRound, Users, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { NotificationToggle } from '@/components/NotificationToggle';
@@ -38,6 +38,14 @@ export const Header = () => {
           <NotificationToggle />
           
           {/* Quick access buttons */}
+          <button 
+            onClick={() => navigate('/general-chat')}
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            title="Chat général"
+          >
+            <MessageCircle className="w-5 h-5 text-foreground" />
+          </button>
+          
           <button 
             onClick={() => navigate('/map')}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"

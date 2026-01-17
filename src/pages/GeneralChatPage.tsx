@@ -1,0 +1,331 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Header } from '@/components/Header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { Send, MessageCircle, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+interface Message {
+  id: string;
+  user_id: string;
+  message: string;
+  created_at: string;
+  profile?: {
+    full_name: string | null;
+  };
+}
+
+interface Profile {
+  user_id: string;
+  full_name: string | null;
+}
+
+const GeneralChatPage = () => {
+  const { user, isAdmin, loading } = useAuth();
+  const navigate = useNavigate();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  // Get organization ID
+  useEffect(() => {
+    const fetchOrganization = async () => {
+      if (!user) return;
+
+      if (isAdmin) {
+        // Admin: get first invite code they created
+        const { data } = await supabase
+          .from('invite_codes')
+          .select('id')
+          .eq('admin_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          setOrganizationId(data.id);
+        }
+      } else {
+        // Employee: get their organization from profile
+        const { data } = await supabase
+          .from('profiles')
+          .select('invite_code_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (data?.invite_code_id) {
+          setOrganizationId(data.invite_code_id);
+        }
+      }
+    };
+
+    fetchOrganization();
+  }, [user, isAdmin]);
+
+  // Fetch messages and profiles
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const fetchMessages = async () => {
+      setLoadingMessages(true);
+
+      const { data: messagesData, error } = await supabase
+        .from('general_messages')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        setLoadingMessages(false);
+        return;
+      }
+
+      // Fetch profiles for all unique user IDs
+      const userIds = [...new Set((messagesData || []).map(m => m.user_id))];
+      
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', userIds);
+
+        const profileMap = new Map<string, string>();
+        (profilesData || []).forEach(p => {
+          profileMap.set(p.user_id, p.full_name || 'Utilisateur');
+        });
+        setProfiles(profileMap);
+      }
+
+      setMessages(messagesData || []);
+      setLoadingMessages(false);
+    };
+
+    fetchMessages();
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel('general-chat')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'general_messages',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        async (payload) => {
+          const newMsg = payload.new as Message;
+          
+          // Fetch profile if not already cached
+          if (!profiles.has(newMsg.user_id)) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('user_id, full_name')
+              .eq('user_id', newMsg.user_id)
+              .maybeSingle();
+            
+            if (data) {
+              setProfiles(prev => new Map(prev).set(data.user_id, data.full_name || 'Utilisateur'));
+            }
+          }
+
+          setMessages(prev => [...prev, newMsg]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [organizationId]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newMessage.trim() || !user || !organizationId) return;
+
+    setSending(true);
+
+    const { error } = await supabase
+      .from('general_messages')
+      .insert({
+        user_id: user.id,
+        message: newMessage.trim(),
+        organization_id: organizationId,
+      });
+
+    if (error) {
+      console.error('Error sending message:', error);
+      toast.error('Erreur lors de l\'envoi');
+    } else {
+      setNewMessage('');
+    }
+
+    setSending(false);
+  };
+
+  const formatMessageTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    
+    if (isToday) {
+      return format(date, 'HH:mm', { locale: fr });
+    }
+    return format(date, 'dd/MM HH:mm', { locale: fr });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Chargement...</div>
+      </div>
+    );
+  }
+
+  if (!organizationId && !loadingMessages) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 pt-20">
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <MessageCircle className="w-16 h-16 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Pas d'organisation</h2>
+            <p className="text-muted-foreground mb-4">
+              {isAdmin 
+                ? 'Créez un code d\'invitation pour activer le chat'
+                : 'Vous n\'êtes pas encore rattaché à une organisation'}
+            </p>
+            {isAdmin && (
+              <Button onClick={() => navigate('/invite-codes')}>
+                Créer un code d'invitation
+              </Button>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="container flex items-center gap-4 h-16 px-4">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg text-foreground">Chat général</h1>
+              <p className="text-xs text-muted-foreground">
+                {messages.length} message{messages.length > 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Messages */}
+      <main className="flex-1 overflow-y-auto px-4 py-4">
+        {loadingMessages ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-pulse text-muted-foreground">Chargement...</div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Aucun message</p>
+            <p className="text-sm text-muted-foreground">Soyez le premier à écrire !</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-w-2xl mx-auto">
+            {messages.map((msg, index) => {
+              const isOwn = msg.user_id === user?.id;
+              const showName = index === 0 || messages[index - 1].user_id !== msg.user_id;
+              const senderName = profiles.get(msg.user_id) || 'Utilisateur';
+
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex flex-col",
+                    isOwn ? "items-end" : "items-start"
+                  )}
+                >
+                  {showName && !isOwn && (
+                    <span className="text-xs text-muted-foreground ml-3 mb-1">
+                      {senderName}
+                    </span>
+                  )}
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-2",
+                      isOwn
+                        ? "bg-primary text-primary-foreground rounded-br-md"
+                        : "bg-secondary text-foreground rounded-bl-md"
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                  </div>
+                  <span className={cn(
+                    "text-xs text-muted-foreground mt-1",
+                    isOwn ? "mr-1" : "ml-1"
+                  )}>
+                    {formatMessageTime(msg.created_at)}
+                  </span>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </main>
+
+      {/* Input */}
+      <footer className="sticky bottom-0 bg-background border-t border-border p-4">
+        <form onSubmit={handleSend} className="flex gap-2 max-w-2xl mx-auto">
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Écrire un message..."
+            className="flex-1 bg-secondary border-border"
+            disabled={sending}
+          />
+          <Button type="submit" size="icon" disabled={sending || !newMessage.trim()}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </form>
+      </footer>
+    </div>
+  );
+};
+
+export default GeneralChatPage;
