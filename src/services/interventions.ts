@@ -189,6 +189,8 @@ export const createIntervention = async (data: {
   description?: string;
   urgency: Urgency;
   created_by: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }): Promise<void> => {
   const { error } = await supabase
     .from('interventions')
