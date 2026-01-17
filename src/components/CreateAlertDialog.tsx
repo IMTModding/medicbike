@@ -1,48 +1,18 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Map } from 'lucide-react';
+import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Navigation } from 'lucide-react';
 import { createIntervention, Urgency } from '@/services/interventions';
 import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-// Lazy load LocationPicker to avoid Leaflet issues on mobile
-const LocationPicker = lazy(() => import('./LocationPicker').then(m => ({ default: m.LocationPicker })));
-
 interface CreateAlertDialogProps {
   onCreated: () => void;
 }
-
-const urgencyLabels: Record<Urgency, string> = {
-  high: 'Urgent',
-  medium: 'Moyen',
-  low: 'Normal',
-};
-
-const urgencyConfig: Record<Urgency, { emoji: string; color: string; bgColor: string; ringColor: string }> = {
-  high: { 
-    emoji: '🔴', 
-    color: 'text-red-500', 
-    bgColor: 'bg-red-500/10',
-    ringColor: 'ring-red-500/50'
-  },
-  medium: { 
-    emoji: '🟠', 
-    color: 'text-orange-500', 
-    bgColor: 'bg-orange-500/10',
-    ringColor: 'ring-orange-500/50'
-  },
-  low: { 
-    emoji: '🟢', 
-    color: 'text-green-500', 
-    bgColor: 'bg-green-500/10',
-    ringColor: 'ring-green-500/50'
-  },
-};
 
 export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [open, setOpen] = useState(false);
@@ -52,16 +22,15 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [urgency] = useState<Urgency>('high');
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
   
   const { user } = useAuth();
 
-  const handleLocationChange = (lat: number, lng: number) => {
-    setLatitude(lat);
-    setLongitude(lng);
+  const openGPSNavigation = () => {
+    if (location.trim()) {
+      const encodedAddress = encodeURIComponent(location.trim());
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,14 +50,10 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
         description: description.trim() || undefined,
         urgency,
         created_by: user.id,
-        latitude,
-        longitude,
       });
       
       // Send push notification to all employees
-      const notifTitle = urgency === 'high' 
-        ? `🚨 URGENT: ${title.trim()}`
-        : `📢 ${title.trim()}`;
+      const notifTitle = `🚨 URGENT: ${title.trim()}`;
       
       await sendPushNotification(
         notifTitle,
@@ -118,13 +83,9 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setTitle('');
     setLocation('');
     setDescription('');
-    
-    setLatitude(null);
-    setLongitude(null);
     setLoading(false);
     setSuccess(false);
     setFocusedField(null);
-    setShowMap(false);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -174,13 +135,10 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-foreground">
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300",
-                  urgencyConfig[urgency].bgColor
-                )}>
-                  <AlertTriangle className={cn("w-4 h-4", urgencyConfig[urgency].color)} />
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
                 </div>
-                <span>Nouvelle alerte</span>
+                <span>Nouvelle alerte urgente</span>
               </DialogTitle>
             </DialogHeader>
             
@@ -207,7 +165,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 />
               </div>
               
-              {/* Location Field */}
+              {/* Location Field with GPS Button */}
               <div className={cn(
                 "space-y-1.5 transition-all duration-200",
                 focusedField === 'location' && "scale-[1.02]"
@@ -216,49 +174,37 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                   <MapPin className="w-3.5 h-3.5" />
                   Adresse *
                 </label>
-                <Input
-                  placeholder="Ex: 15 Rue de la Paix, Paris"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onFocus={() => setFocusedField('location')}
-                  onBlur={() => setFocusedField(null)}
-                  className={cn(
-                    "bg-secondary border-border transition-all duration-200",
-                    focusedField === 'location' && "ring-2 ring-primary/50 border-primary"
-                  )}
-                />
-              </div>
-              
-              {/* GPS Location - Optional */}
-              <div className="space-y-2">
-                {!showMap ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ex: 15 Rue de la Paix, Paris"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    onFocus={() => setFocusedField('location')}
+                    onBlur={() => setFocusedField(null)}
+                    className={cn(
+                      "bg-secondary border-border transition-all duration-200 flex-1",
+                      focusedField === 'location' && "ring-2 ring-primary/50 border-primary"
+                    )}
+                  />
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={() => setShowMap(true)}
-                    className="w-full"
+                    size="icon"
+                    onClick={openGPSNavigation}
+                    disabled={!location.trim()}
+                    className={cn(
+                      "shrink-0 transition-all duration-200",
+                      location.trim() && "text-blue-500 border-blue-500/50 hover:bg-blue-500/10"
+                    )}
+                    title="Ouvrir le trajet GPS"
                   >
-                    <Map className="w-4 h-4 mr-2" />
-                    Ajouter une position GPS (optionnel)
+                    <Navigation className="w-4 h-4" />
                   </Button>
-                ) : (
-                  <Suspense fallback={
-                    <div className="h-48 rounded-lg bg-secondary flex items-center justify-center">
-                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                    </div>
-                  }>
-                    <LocationPicker
-                      latitude={latitude}
-                      longitude={longitude}
-                      onLocationChange={handleLocationChange}
-                    />
-                  </Suspense>
-                )}
-                {latitude && longitude && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    Position: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                </div>
+                {location.trim() && (
+                  <p className="text-xs text-blue-500 flex items-center gap-1">
+                    <Navigation className="w-3 h-3" />
+                    Cliquez sur l'icône pour ouvrir le trajet GPS
                   </p>
                 )}
               </div>
