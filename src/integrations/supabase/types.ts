@@ -48,29 +48,35 @@ export type Database = {
       }
       interventions: {
         Row: {
+          completed_at: string | null
           created_at: string
           created_by: string | null
           description: string | null
           id: string
           location: string
+          status: Database["public"]["Enums"]["intervention_status"]
           title: string
           urgency: Database["public"]["Enums"]["urgency_level"]
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
           location: string
+          status?: Database["public"]["Enums"]["intervention_status"]
           title: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
           location?: string
+          status?: Database["public"]["Enums"]["intervention_status"]
           title?: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
         }
@@ -157,6 +163,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee"
+      intervention_status: "active" | "completed"
       response_status: "pending" | "available" | "unavailable"
       urgency_level: "high" | "medium" | "low"
     }
@@ -287,6 +294,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee"],
+      intervention_status: ["active", "completed"],
       response_status: ["pending", "available", "unavailable"],
       urgency_level: ["high", "medium", "low"],
     },
