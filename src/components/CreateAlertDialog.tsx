@@ -9,6 +9,7 @@ import { createIntervention, Urgency } from '@/services/interventions';
 import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { LocationPicker } from './LocationPicker';
 
 interface CreateAlertDialogProps {
   onCreated: () => void;
@@ -27,8 +28,15 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [urgency, setUrgency] = useState<Urgency>('medium');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   
   const { user } = useAuth();
+
+  const handleLocationChange = (lat: number, lng: number) => {
+    setLatitude(lat);
+    setLongitude(lng);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +55,8 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
         description: description.trim() || undefined,
         urgency,
         created_by: user.id,
+        latitude,
+        longitude,
       });
       
       // Send push notification to all employees
@@ -78,6 +88,8 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setLocation('');
     setDescription('');
     setUrgency('medium');
+    setLatitude(null);
+    setLongitude(null);
   };
 
   return (
@@ -87,7 +99,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
           <Plus className="w-6 h-6" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border max-w-md mx-4">
+      <DialogContent className="bg-card border-border max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <AlertTriangle className="w-5 h-5 text-primary" />
@@ -119,6 +131,12 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
               className="bg-secondary border-border"
             />
           </div>
+          
+          <LocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onLocationChange={handleLocationChange}
+          />
           
           <div>
             <label className="text-sm text-muted-foreground mb-1.5 block">
