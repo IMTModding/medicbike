@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Bell, Mail, Lock, User, AlertCircle, KeyRound, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -15,11 +15,37 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [codeValidated, setCodeValidated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [validatingCode, setValidatingCode] = useState(false);
   
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, validateInviteCode } = useAuth();
   const navigate = useNavigate();
+
+  const handleValidateCode = async () => {
+    if (!inviteCode.trim()) {
+      setError('Veuillez entrer un code d\'invitation');
+      return;
+    }
+    
+    setValidatingCode(true);
+    setError('');
+    
+    const result = await validateInviteCode(inviteCode);
+    
+    if (result.valid) {
+      setCodeValidated(true);
+      setOrganizationName(result.organizationName || '');
+      toast.success(`Code valide ! Organisation: ${result.organizationName}`);
+    } else {
+      setError('Code d\'invitation invalide ou expiré');
+    }
+    
+    setValidatingCode(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +60,11 @@ const Auth = () => {
         setError(err.errors[0].message);
         return;
       }
+    }
+    
+    if (!isLogin && !codeValidated) {
+      setError('Veuillez d\'abord valider votre code d\'invitation');
+      return;
     }
     
     setLoading(true);
@@ -58,7 +89,7 @@ const Auth = () => {
           return;
         }
         
-        const { error } = await signUp(email, password, fullName);
+        const { error } = await signUp(email, password, fullName, inviteCode);
         if (error) {
           if (error.message.includes('already registered')) {
             setError('Cet email est déjà utilisé');
@@ -110,16 +141,60 @@ const Auth = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Nom complet"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="pl-10 h-12 bg-secondary border-border"
-              />
-            </div>
+            <>
+              {/* Invite Code Section */}
+              <div className="space-y-2">
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Code d'invitation"
+                      value={inviteCode}
+                      onChange={(e) => {
+                        setInviteCode(e.target.value.toUpperCase());
+                        setCodeValidated(false);
+                      }}
+                      className="pl-10 h-12 bg-secondary border-border uppercase"
+                      maxLength={6}
+                      disabled={codeValidated}
+                    />
+                  </div>
+                  {!codeValidated ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-12 px-4"
+                      onClick={handleValidateCode}
+                      disabled={validatingCode}
+                    >
+                      {validatingCode ? '...' : 'Valider'}
+                    </Button>
+                  ) : (
+                    <div className="h-12 px-4 flex items-center text-green-500">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
+                {codeValidated && (
+                  <p className="text-xs text-green-500 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Organisation: {organizationName}
+                  </p>
+                )}
+              </div>
+              
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Nom complet"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="pl-10 h-12 bg-secondary border-border"
+                />
+              </div>
+            </>
           )}
           
           <div className="relative">

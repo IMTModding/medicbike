@@ -147,26 +147,67 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_codes: {
+        Row: {
+          admin_id: string
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          organization_name: string
+        }
+        Insert: {
+          admin_id: string
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_name: string
+        }
+        Update: {
+          admin_id?: string
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          admin_id: string | null
           created_at: string
           full_name: string | null
           id: string
+          invite_code_id: string | null
           user_id: string
         }
         Insert: {
+          admin_id?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          invite_code_id?: string | null
           user_id: string
         }
         Update: {
+          admin_id?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          invite_code_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_invite_code_id_fkey"
+            columns: ["invite_code_id"]
+            isOneToOne: false
+            referencedRelation: "invite_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
@@ -218,6 +259,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invite_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -1,4 +1,4 @@
-import { Bell, LogOut, LayoutDashboard, History, MapPin, BarChart3, Calendar, User } from 'lucide-react';
+import { Bell, LogOut, LayoutDashboard, History, MapPin, BarChart3, Calendar, User, KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { NotificationToggle } from '@/components/NotificationToggle';
@@ -83,6 +83,10 @@ export const Header = () => {
                   <DropdownMenuItem onClick={() => navigate('/admin')}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Dashboard admin
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/invite-codes')}>
+                    <KeyRound className="w-4 h-4 mr-2" />
+                    Codes d'invitation
                   </DropdownMenuItem>
                 </>
               )}

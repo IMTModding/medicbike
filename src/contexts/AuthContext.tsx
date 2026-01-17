@@ -10,9 +10,10 @@ interface AuthContextType {
   loading: boolean;
   role: UserRole | null;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, inviteCode: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  validateInviteCode: (code: string) => Promise<{ valid: boolean; organizationName?: string; adminId?: string; codeId?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,10 +68,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const validateInviteCode = async (code: string) => {
+    const { data, error } = await supabase
+      .from('invite_codes')
+      .select('id, admin_id, organization_name')
+      .eq('code', code.toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (error || !data) {
+      return { valid: false };
+    }
+    
+    return { 
+      valid: true, 
+      organizationName: data.organization_name,
+      adminId: data.admin_id,
+      codeId: data.id
+    };
+  };
+
+  const signUp = async (email: string, password: string, fullName: string, inviteCode: string) => {
+    // Validate invite code first
+    const codeValidation = await validateInviteCode(inviteCode);
+    if (!codeValidation.valid) {
+      return { error: new Error('Code d\'invitation invalide ou expiré') };
+    }
+    
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -81,7 +108,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       },
     });
     
-    return { error };
+    if (error) {
+      return { error };
+    }
+    
+    // Update profile with invite code and admin link
+    if (data.user) {
+      await supabase
+        .from('profiles')
+        .update({
+          invite_code_id: codeValidation.codeId,
+          admin_id: codeValidation.adminId,
+        })
+        .eq('user_id', data.user.id);
+    }
+    
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -101,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAdmin = role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, isAdmin, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, role, isAdmin, signUp, signIn, signOut, validateInviteCode }}>
       {children}
     </AuthContext.Provider>
   );
