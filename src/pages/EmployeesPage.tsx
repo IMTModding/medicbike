@@ -18,10 +18,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Mail, Building2, Calendar, UserX } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface Employee {
   id: string;
@@ -33,6 +34,16 @@ interface Employee {
   email?: string;
 }
 
+interface PresenceState {
+  [key: string]: { user_id: string; online_at: string }[];
+}
+
+interface Availability {
+  user_id: string;
+  start_time: string;
+  end_time: string;
+}
+
 const EmployeesPage = () => {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +52,8 @@ const EmployeesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [todayAvailabilities, setTodayAvailabilities] = useState<Map<string, Availability>>(new Map());
 
   useEffect(() => {
     if (!loading && !user) {
@@ -53,7 +66,43 @@ const EmployeesPage = () => {
   useEffect(() => {
     if (user && isAdmin) {
       fetchEmployees();
+      fetchTodayAvailabilities();
     }
+  }, [user, isAdmin]);
+
+  // Real-time presence tracking
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const channel = supabase.channel('employees-presence');
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState() as PresenceState;
+        const online = new Set<string>();
+        
+        Object.values(state).forEach((presences) => {
+          presences.forEach((presence) => {
+            if (presence.user_id) {
+              online.add(presence.user_id);
+            }
+          });
+        });
+        
+        setOnlineUsers(online);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && user) {
+          await channel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [user, isAdmin]);
 
   useEffect(() => {
@@ -71,6 +120,27 @@ const EmployeesPage = () => {
       );
     }
   }, [searchQuery, employees]);
+
+  const fetchTodayAvailabilities = async () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    const { data, error } = await supabase
+      .from('availabilities')
+      .select('user_id, start_time, end_time')
+      .eq('date', today);
+
+    if (error) {
+      console.error('Error fetching availabilities:', error);
+      return;
+    }
+
+    const availMap = new Map<string, Availability>();
+    (data || []).forEach((av) => {
+      availMap.set(av.user_id, av);
+    });
+    
+    setTodayAvailabilities(availMap);
+  };
 
   const fetchEmployees = async () => {
     if (!user) return;
@@ -112,8 +182,6 @@ const EmployeesPage = () => {
       return;
     }
 
-    // Fetch user emails from auth (we need to use an edge function or store emails differently)
-    // For now, we'll show profiles without emails
     const employeesData: Employee[] = (profiles || []).map((profile) => ({
       id: profile.id,
       user_id: profile.user_id,
@@ -134,7 +202,6 @@ const EmployeesPage = () => {
     setDeletingId(employeeId);
 
     try {
-      // Remove the link to the organization (don't delete the profile entirely)
       const { error } = await supabase
         .from('profiles')
         .update({ invite_code_id: null, admin_id: null })
@@ -152,6 +219,43 @@ const EmployeesPage = () => {
     }
   };
 
+  const getEmployeeStatus = (userId: string) => {
+    const isOnline = onlineUsers.has(userId);
+    const availability = todayAvailabilities.get(userId);
+    
+    if (isOnline) {
+      return { label: 'En ligne', color: 'bg-green-500', textColor: 'text-green-500' };
+    }
+    
+    if (availability) {
+      const now = new Date();
+      const [startH, startM] = availability.start_time.split(':').map(Number);
+      const [endH, endM] = availability.end_time.split(':').map(Number);
+      
+      const startTime = new Date();
+      startTime.setHours(startH, startM, 0);
+      
+      const endTime = new Date();
+      endTime.setHours(endH, endM, 0);
+      
+      if (now >= startTime && now <= endTime) {
+        return { 
+          label: `Dispo ${availability.start_time.slice(0,5)}-${availability.end_time.slice(0,5)}`, 
+          color: 'bg-blue-500', 
+          textColor: 'text-blue-500' 
+        };
+      }
+      
+      return { 
+        label: `Prévu ${availability.start_time.slice(0,5)}-${availability.end_time.slice(0,5)}`, 
+        color: 'bg-yellow-500', 
+        textColor: 'text-yellow-500' 
+      };
+    }
+    
+    return { label: 'Hors ligne', color: 'bg-muted-foreground', textColor: 'text-muted-foreground' };
+  };
+
   if (loading || loadingEmployees) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -159,6 +263,21 @@ const EmployeesPage = () => {
       </div>
     );
   }
+
+  // Count stats
+  const onlineCount = employees.filter(e => onlineUsers.has(e.user_id)).length;
+  const availableCount = employees.filter(e => {
+    const av = todayAvailabilities.get(e.user_id);
+    if (!av) return false;
+    const now = new Date();
+    const [startH, startM] = av.start_time.split(':').map(Number);
+    const [endH, endM] = av.end_time.split(':').map(Number);
+    const startTime = new Date();
+    startTime.setHours(startH, startM, 0);
+    const endTime = new Date();
+    endTime.setHours(endH, endM, 0);
+    return now >= startTime && now <= endTime;
+  }).length;
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -173,6 +292,37 @@ const EmployeesPage = () => {
           <p className="text-muted-foreground text-sm">
             {employees.length} employé{employees.length > 1 ? 's' : ''} dans votre organisation
           </p>
+        </div>
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <Card className="bg-card border-border">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="w-4 h-4 text-primary" />
+                <span className="text-xs text-muted-foreground">Total</span>
+              </div>
+              <p className="text-xl font-bold text-foreground">{employees.length}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Circle className="w-4 h-4 text-green-500 fill-green-500" />
+                <span className="text-xs text-muted-foreground">En ligne</span>
+              </div>
+              <p className="text-xl font-bold text-green-500">{onlineCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <span className="text-xs text-muted-foreground">Dispo</span>
+              </div>
+              <p className="text-xl font-bold text-blue-500">{availableCount}</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search bar */}
@@ -212,73 +362,85 @@ const EmployeesPage = () => {
               </CardContent>
             </Card>
           ) : (
-            filteredEmployees.map((employee) => (
-              <Card key={employee.id} className="bg-card border-border">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-foreground truncate">
-                          {employee.full_name || 'Sans nom'}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">
-                          Employé
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                        {employee.organization_name && (
-                          <span className="flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {employee.organization_name}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Inscrit le{' '}
-                          {format(new Date(employee.created_at), 'dd MMM yyyy', {
-                            locale: fr,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          disabled={deletingId === employee.id}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Retirer cet employé ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {employee.full_name || 'Cet employé'} sera retiré de votre
-                            organisation. Il pourra toujours accéder à son compte mais ne
-                            sera plus lié à vos interventions.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() =>
-                              handleRemoveEmployee(employee.id, employee.user_id)
-                            }
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            filteredEmployees.map((employee) => {
+              const status = getEmployeeStatus(employee.user_id);
+              
+              return (
+                <Card key={employee.id} className="bg-card border-border">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {/* Online indicator */}
+                          <div className={cn(
+                            "w-2.5 h-2.5 rounded-full",
+                            status.color
+                          )} />
+                          <h3 className="font-semibold text-foreground truncate">
+                            {employee.full_name || 'Sans nom'}
+                          </h3>
+                          <Badge 
+                            variant="outline" 
+                            className={cn("text-xs", status.textColor)}
                           >
-                            Retirer
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          {employee.organization_name && (
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-3 h-3" />
+                              {employee.organization_name}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Inscrit le{' '}
+                            {format(new Date(employee.created_at), 'dd MMM yyyy', {
+                              locale: fr,
+                            })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            disabled={deletingId === employee.id}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Retirer cet employé ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {employee.full_name || 'Cet employé'} sera retiré de votre
+                              organisation. Il pourra toujours accéder à son compte mais ne
+                              sera plus lié à vos interventions.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() =>
+                                handleRemoveEmployee(employee.id, employee.user_id)
+                              }
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Retirer
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </main>
