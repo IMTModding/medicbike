@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, Mail, Lock, User, AlertCircle, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, KeyRound, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import logo from '@/assets/logo.jpg';
 
 const emailSchema = z.string().email('Email invalide');
 const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères');
@@ -111,13 +112,11 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-          <Bell className="w-6 h-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-bold text-xl text-foreground">Interventions</h1>
-          <p className="text-xs text-muted-foreground">Système d'alertes</p>
+      <div className="flex flex-col items-center gap-3 mb-8">
+        <img src={logo} alt="MEDICBIKE Logo" className="w-24 h-24 rounded-full object-cover shadow-lg" />
+        <div className="text-center">
+          <h1 className="font-bold text-2xl text-foreground">MEDICBIKE</h1>
+          <p className="text-sm text-muted-foreground">Unité Médicale Motocycliste</p>
         </div>
       </div>
 
