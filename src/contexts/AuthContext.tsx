@@ -69,22 +69,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const validateInviteCode = async (code: string) => {
+    // Use secure server-side function to validate code without exposing all codes
     const { data, error } = await supabase
-      .from('invite_codes')
-      .select('id, admin_id, organization_name')
-      .eq('code', code.toUpperCase())
-      .eq('is_active', true)
-      .maybeSingle();
+      .rpc('validate_invite_code', { code_to_validate: code });
     
-    if (error || !data) {
+    if (error || !data || data.length === 0 || !data[0].is_valid) {
       return { valid: false };
     }
     
+    const result = data[0];
     return { 
       valid: true, 
-      organizationName: data.organization_name,
-      adminId: data.admin_id,
-      codeId: data.id
+      organizationName: result.organization_name,
+      adminId: result.admin_id,
+      codeId: result.code_id
     };
   };
 
