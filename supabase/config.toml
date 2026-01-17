@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.export-history]
 verify_jwt = false
+
+[functions.vapid-public-key]
+verify_jwt = false
