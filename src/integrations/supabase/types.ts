@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      availabilities: {
+        Row: {
+          created_at: string
+          date: string
+          end_time: string
+          id: string
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          end_time: string
+          id?: string
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      intervention_messages: {
+        Row: {
+          created_at: string
+          id: string
+          intervention_id: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intervention_id: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intervention_id?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_messages_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "interventions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intervention_responses: {
         Row: {
           id: string
@@ -53,7 +112,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          latitude: number | null
           location: string
+          longitude: number | null
           status: Database["public"]["Enums"]["intervention_status"]
           title: string
           urgency: Database["public"]["Enums"]["urgency_level"]
@@ -64,7 +125,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          latitude?: number | null
           location: string
+          longitude?: number | null
           status?: Database["public"]["Enums"]["intervention_status"]
           title: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
@@ -75,7 +138,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          latitude?: number | null
           location?: string
+          longitude?: number | null
           status?: Database["public"]["Enums"]["intervention_status"]
           title?: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
