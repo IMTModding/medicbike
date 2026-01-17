@@ -14,6 +14,8 @@ export interface Intervention {
   created_by: string | null;
   status: InterventionStatus;
   completed_at: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   userStatus?: ResponseStatus;
 }
 

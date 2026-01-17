@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchActiveInterventions, InterventionWithResponses } from '@/services/interventions';
+import { fetchInterventionsWithResponses, InterventionWithResponses } from '@/services/interventions';
 import { ArrowLeft, Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -53,7 +53,7 @@ const MapPage = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await fetchActiveInterventions();
+        const data = await fetchInterventionsWithResponses('active');
         // Filter only interventions with coordinates
         setInterventions(data.filter(i => i.latitude && i.longitude));
       } catch (error) {
