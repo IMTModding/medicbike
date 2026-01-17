@@ -1,4 +1,4 @@
-import { LogOut, LayoutDashboard, History, MapPin, BarChart3, Calendar, User, KeyRound, Users, MessageCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, MapPin, BarChart3, User, KeyRound, Users, MessageCircle } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -75,10 +75,6 @@ export const Header = () => {
               <DropdownMenuItem onClick={() => navigate('/profile')}>
                 <User className="w-4 h-4 mr-2" />
                 Mon profil
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/availability')}>
-                <Calendar className="w-4 h-4 mr-2" />
-                Mes disponibilités
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/history')}>
                 <History className="w-4 h-4 mr-2" />
