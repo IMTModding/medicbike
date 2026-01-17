@@ -20,6 +20,13 @@ export interface InterventionResponse {
   user_id: string;
   status: ResponseStatus;
   responded_at: string;
+  profile?: {
+    full_name: string | null;
+  };
+}
+
+export interface InterventionWithResponses extends Intervention {
+  responses: InterventionResponse[];
 }
 
 export const fetchInterventions = async (userId: string): Promise<Intervention[]> => {
@@ -43,6 +50,43 @@ export const fetchInterventions = async (userId: string): Promise<Intervention[]
     return {
       ...intervention,
       userStatus: userResponse?.status as ResponseStatus || 'pending',
+    };
+  });
+};
+
+export const fetchInterventionsWithResponses = async (): Promise<InterventionWithResponses[]> => {
+  // Fetch interventions
+  const { data: interventions, error: intError } = await supabase
+    .from('interventions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (intError) throw intError;
+
+  // Fetch all responses with profiles
+  const { data: responses, error: respError } = await supabase
+    .from('intervention_responses')
+    .select('*');
+
+  if (respError) throw respError;
+
+  // Fetch all profiles
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('user_id, full_name');
+
+  // Map responses with profiles and group by intervention
+  return (interventions || []).map(intervention => {
+    const interventionResponses = (responses || [])
+      .filter(r => r.intervention_id === intervention.id)
+      .map(r => ({
+        ...r,
+        profile: profiles?.find(p => p.user_id === r.user_id),
+      }));
+
+    return {
+      ...intervention,
+      responses: interventionResponses,
     };
   });
 };
@@ -100,6 +144,23 @@ export const subscribeToInterventions = (
         event: '*',
         schema: 'public',
         table: 'interventions',
+      },
+      callback
+    )
+    .subscribe();
+};
+
+export const subscribeToResponses = (
+  callback: (payload: any) => void
+) => {
+  return supabase
+    .channel('responses-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'intervention_responses',
       },
       callback
     )

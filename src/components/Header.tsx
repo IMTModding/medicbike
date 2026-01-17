@@ -1,4 +1,4 @@
-import { Bell, LogOut } from 'lucide-react';
+import { Bell, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,12 +26,22 @@ export const Header = () => {
           </div>
         </div>
         
-        <button 
-          onClick={handleSignOut}
-          className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
-        >
-          <LogOut className="w-5 h-5 text-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+          {role === 'admin' && (
+            <button 
+              onClick={() => navigate('/admin')}
+              className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            >
+              <LayoutDashboard className="w-5 h-5 text-foreground" />
+            </button>
+          )}
+          <button 
+            onClick={handleSignOut}
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+          >
+            <LogOut className="w-5 h-5 text-foreground" />
+          </button>
+        </div>
       </div>
     </header>
   );
