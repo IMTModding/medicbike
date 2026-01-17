@@ -7,7 +7,6 @@ import {
 } from '@/services/interventions';
 import { 
   ArrowLeft, 
-  AlertTriangle, 
   CheckCircle2, 
   XCircle, 
   Clock, 
@@ -23,7 +22,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
+import ExportHistoryDialog from '@/components/ExportHistoryDialog';
 const getUrgencyConfig = (urgency: string) => {
   switch (urgency) {
     case 'high':
@@ -127,14 +126,17 @@ const HistoryPage = () => {
             </div>
           </div>
           
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(showFilters && "bg-primary text-primary-foreground")}
-          >
-            <Filter className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportHistoryDialog startDate={startDate} endDate={endDate} />
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(showFilters && "bg-primary text-primary-foreground")}
+            >
+              <Filter className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 

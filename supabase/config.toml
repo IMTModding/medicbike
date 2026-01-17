@@ -1,1 +1,7 @@
 project_id = "csmlelbyyqsiymsqfeuj"
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.export-history]
+verify_jwt = false
