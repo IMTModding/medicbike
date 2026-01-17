@@ -51,7 +51,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
-  const [urgency, setUrgency] = useState<Urgency>('medium');
+  const [urgency] = useState<Urgency>('high');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -118,7 +118,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setTitle('');
     setLocation('');
     setDescription('');
-    setUrgency('medium');
+    
     setLatitude(null);
     setLongitude(null);
     setLoading(false);
@@ -285,34 +285,10 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 />
               </div>
               
-              {/* Urgency Selection */}
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">
-                  Niveau d'urgence
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['high', 'medium', 'low'] as Urgency[]).map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() => setUrgency(level)}
-                      className={cn(
-                        "flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all duration-200",
-                        urgency === level 
-                          ? cn("border-current", urgencyConfig[level].color, urgencyConfig[level].bgColor, "scale-105")
-                          : "border-border bg-secondary hover:bg-secondary/80"
-                      )}
-                    >
-                      <span className="text-lg">{urgencyConfig[level].emoji}</span>
-                      <span className={cn(
-                        "text-xs font-medium",
-                        urgency === level ? urgencyConfig[level].color : "text-muted-foreground"
-                      )}>
-                        {urgencyLabels[level]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              {/* Urgency Badge - Fixed to Urgent */}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                <span className="text-lg">🔴</span>
+                <span className="text-sm font-medium text-red-500">Alerte Urgente</span>
               </div>
               
               {/* Action Buttons */}
