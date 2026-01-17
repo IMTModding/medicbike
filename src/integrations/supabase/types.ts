@@ -292,6 +292,13 @@ export type Database = {
     }
     Functions: {
       generate_invite_code: { Args: never; Returns: string }
+      get_user_organization_info: {
+        Args: { user_id_param: string }
+        Returns: {
+          user_admin_id: string
+          user_invite_code_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
