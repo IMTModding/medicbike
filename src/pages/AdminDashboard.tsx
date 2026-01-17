@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   fetchInterventionsWithResponses, 
   deleteIntervention,
+  completeIntervention,
   subscribeToInterventions,
   subscribeToResponses,
   InterventionWithResponses 
@@ -17,7 +18,8 @@ import {
   MapPin,
   Trash2,
   Users,
-  Loader2
+  Loader2,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -70,14 +72,14 @@ const getTimeAgo = (dateString: string) => {
 const AdminDashboard = () => {
   const [interventions, setInterventions] = useState<InterventionWithResponses[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   
   const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
 
   const loadData = useCallback(async () => {
     try {
-      const data = await fetchInterventionsWithResponses();
+      const data = await fetchInterventionsWithResponses('active');
       setInterventions(data);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -112,10 +114,23 @@ const AdminDashboard = () => {
     }
   }, [user, role, loadData]);
 
+  const handleComplete = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await completeIntervention(id);
+      toast.success('Intervention marquée comme terminée');
+      loadData();
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Supprimer cette intervention ?')) return;
     
-    setDeleting(id);
+    setActionLoading(id);
     try {
       await deleteIntervention(id);
       toast.success('Intervention supprimée');
@@ -123,7 +138,7 @@ const AdminDashboard = () => {
     } catch (error) {
       toast.error('Erreur lors de la suppression');
     } finally {
-      setDeleting(null);
+      setActionLoading(null);
     }
   };
 
@@ -170,7 +185,7 @@ const AdminDashboard = () => {
           <div className="bg-card rounded-xl p-3 border border-border">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Interventions</span>
+              <span className="text-xs text-muted-foreground">Actives</span>
             </div>
             <p className="text-2xl font-bold text-foreground">{interventions.length}</p>
           </div>
@@ -192,12 +207,23 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Quick Links */}
+        <Button
+          variant="secondary"
+          className="w-full mb-6"
+          onClick={() => navigate('/history')}
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          Voir l'historique des interventions
+        </Button>
+
         {/* Interventions List */}
         <div className="space-y-4">
           {interventions.map(intervention => {
             const urgencyConfig = getUrgencyConfig(intervention.urgency);
             const availableCount = intervention.responses.filter(r => r.status === 'available').length;
             const unavailableCount = intervention.responses.filter(r => r.status === 'unavailable').length;
+            const isLoading = actionLoading === intervention.id;
 
             return (
               <div 
@@ -215,23 +241,33 @@ const AdminDashboard = () => {
                       {urgencyConfig.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1 mr-2">
                       <Clock className="w-3 h-3" />
                       {getTimeAgo(intervention.created_at)}
                     </span>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(intervention.id)}
-                      disabled={deleting === intervention.id}
+                      className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                      onClick={() => handleComplete(intervention.id)}
+                      disabled={isLoading}
+                      title="Marquer comme terminée"
                     >
-                      {deleting === intervention.id ? (
+                      {isLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Trash2 className="w-4 h-4" />
+                        <Check className="w-4 h-4" />
                       )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(intervention.id)}
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -300,7 +336,7 @@ const AdminDashboard = () => {
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-semibold text-foreground mb-2">Aucune intervention</h3>
+            <h3 className="font-semibold text-foreground mb-2">Aucune intervention active</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Créez votre première alerte depuis la page principale
             </p>

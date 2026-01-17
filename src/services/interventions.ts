@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type Urgency = 'high' | 'medium' | 'low';
 export type ResponseStatus = 'pending' | 'available' | 'unavailable';
+export type InterventionStatus = 'active' | 'completed';
 
 export interface Intervention {
   id: string;
@@ -11,6 +12,8 @@ export interface Intervention {
   urgency: Urgency;
   created_at: string;
   created_by: string | null;
+  status: InterventionStatus;
+  completed_at: string | null;
   userStatus?: ResponseStatus;
 }
 
@@ -29,12 +32,18 @@ export interface InterventionWithResponses extends Intervention {
   responses: InterventionResponse[];
 }
 
-export const fetchInterventions = async (userId: string): Promise<Intervention[]> => {
+export const fetchInterventions = async (userId: string, includeCompleted = false): Promise<Intervention[]> => {
   // Fetch interventions
-  const { data: interventions, error } = await supabase
+  let query = supabase
     .from('interventions')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (!includeCompleted) {
+    query = query.eq('status', 'active');
+  }
+
+  const { data: interventions, error } = await query;
 
   if (error) throw error;
 
@@ -54,12 +63,18 @@ export const fetchInterventions = async (userId: string): Promise<Intervention[]
   });
 };
 
-export const fetchInterventionsWithResponses = async (): Promise<InterventionWithResponses[]> => {
+export const fetchInterventionsWithResponses = async (status?: InterventionStatus): Promise<InterventionWithResponses[]> => {
   // Fetch interventions
-  const { data: interventions, error: intError } = await supabase
+  let query = supabase
     .from('interventions')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data: interventions, error: intError } = await query;
 
   if (intError) throw intError;
 
@@ -76,6 +91,62 @@ export const fetchInterventionsWithResponses = async (): Promise<InterventionWit
     .select('user_id, full_name');
 
   // Map responses with profiles and group by intervention
+  return (interventions || []).map(intervention => {
+    const interventionResponses = (responses || [])
+      .filter(r => r.intervention_id === intervention.id)
+      .map(r => ({
+        ...r,
+        profile: profiles?.find(p => p.user_id === r.user_id),
+      }));
+
+    return {
+      ...intervention,
+      responses: interventionResponses,
+    };
+  });
+};
+
+export const fetchHistoryInterventions = async (
+  startDate?: Date,
+  endDate?: Date
+): Promise<InterventionWithResponses[]> => {
+  let query = supabase
+    .from('interventions')
+    .select('*')
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false });
+
+  if (startDate) {
+    query = query.gte('completed_at', startDate.toISOString());
+  }
+  if (endDate) {
+    // Add one day to include the end date fully
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    query = query.lte('completed_at', endOfDay.toISOString());
+  }
+
+  const { data: interventions, error: intError } = await query;
+
+  if (intError) throw intError;
+
+  // Fetch all responses
+  const interventionIds = (interventions || []).map(i => i.id);
+  
+  if (interventionIds.length === 0) {
+    return [];
+  }
+
+  const { data: responses } = await supabase
+    .from('intervention_responses')
+    .select('*')
+    .in('intervention_id', interventionIds);
+
+  // Fetch all profiles
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('user_id, full_name');
+
   return (interventions || []).map(intervention => {
     const interventionResponses = (responses || [])
       .filter(r => r.intervention_id === intervention.id)
@@ -119,7 +190,22 @@ export const createIntervention = async (data: {
 }): Promise<void> => {
   const { error } = await supabase
     .from('interventions')
-    .insert(data);
+    .insert({
+      ...data,
+      status: 'active',
+    });
+
+  if (error) throw error;
+};
+
+export const completeIntervention = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('interventions')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', id);
 
   if (error) throw error;
 };

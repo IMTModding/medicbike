@@ -1,4 +1,4 @@
-import { Bell, LogOut, LayoutDashboard } from 'lucide-react';
+import { Bell, LogOut, LayoutDashboard, History } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { NotificationToggle } from '@/components/NotificationToggle';
@@ -29,10 +29,18 @@ export const Header = () => {
         
         <div className="flex items-center gap-1">
           <NotificationToggle />
+          <button 
+            onClick={() => navigate('/history')}
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            title="Historique"
+          >
+            <History className="w-5 h-5 text-foreground" />
+          </button>
           {role === 'admin' && (
             <button 
               onClick={() => navigate('/admin')}
               className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+              title="Dashboard admin"
             >
               <LayoutDashboard className="w-5 h-5 text-foreground" />
             </button>
@@ -40,6 +48,7 @@ export const Header = () => {
           <button 
             onClick={handleSignOut}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            title="Déconnexion"
           >
             <LogOut className="w-5 h-5 text-foreground" />
           </button>
