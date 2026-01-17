@@ -8,6 +8,7 @@ import {
   fetchInterventions, 
   respondToIntervention, 
   subscribeToInterventions,
+  subscribeToResponses,
   Intervention 
 } from '@/services/interventions';
 import { AlertTriangle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
@@ -44,13 +45,21 @@ const Index = () => {
     if (user) {
       loadInterventions();
       
-      // Subscribe to realtime updates
-      const channel = subscribeToInterventions(() => {
+      // Subscribe to realtime updates for interventions
+      const interventionsChannel = subscribeToInterventions(() => {
+        console.log('Realtime: Intervention updated');
+        loadInterventions();
+      });
+
+      // Subscribe to realtime updates for responses
+      const responsesChannel = subscribeToResponses(() => {
+        console.log('Realtime: Response updated');
         loadInterventions();
       });
       
       return () => {
-        channel.unsubscribe();
+        interventionsChannel.unsubscribe();
+        responsesChannel.unsubscribe();
       };
     }
   }, [user, loadInterventions]);
