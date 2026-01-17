@@ -19,16 +19,21 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
+  const [numero, setNumero] = useState('');
+  const [rue, setRue] = useState('');
+  const [codePostal, setCodePostal] = useState('');
+  const [ville, setVille] = useState('');
   const [description, setDescription] = useState('');
   const [urgency] = useState<Urgency>('high');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   
   const { user } = useAuth();
 
+  const fullAddress = [numero, rue, codePostal, ville].filter(Boolean).join(' ').trim();
+
   const openGPSNavigation = () => {
-    if (location.trim()) {
-      const encodedAddress = encodeURIComponent(location.trim());
+    if (fullAddress) {
+      const encodedAddress = encodeURIComponent(fullAddress);
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
     }
   };
@@ -36,7 +41,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim() || !location.trim() || !user) {
+    if (!title.trim() || !rue.trim() || !ville.trim() || !user) {
       toast.error('Veuillez remplir tous les champs requis');
       return;
     }
@@ -46,7 +51,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     try {
       await createIntervention({
         title: title.trim(),
-        location: location.trim(),
+        location: fullAddress,
         description: description.trim() || undefined,
         urgency,
         created_by: user.id,
@@ -57,7 +62,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
       
       await sendPushNotification(
         notifTitle,
-        `📍 ${location.trim()}`,
+        `📍 ${fullAddress}`,
         urgency,
         crypto.randomUUID()
       );
@@ -81,7 +86,10 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
 
   const resetForm = () => {
     setTitle('');
-    setLocation('');
+    setNumero('');
+    setRue('');
+    setCodePostal('');
+    setVille('');
     setDescription('');
     setLoading(false);
     setSuccess(false);
@@ -95,7 +103,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     }
   };
 
-  const isFormValid = title.trim() && location.trim();
+  const isFormValid = title.trim() && rue.trim() && ville.trim();
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -165,47 +173,77 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 />
               </div>
               
-              {/* Location Field with GPS Button */}
-              <div className={cn(
-                "space-y-1.5 transition-all duration-200",
-                focusedField === 'location' && "scale-[1.02]"
-              )}>
+              {/* Address Fields */}
+              <div className="space-y-3">
                 <label className="text-sm text-muted-foreground flex items-center gap-2">
                   <MapPin className="w-3.5 h-3.5" />
                   Adresse *
                 </label>
+                
+                {/* Numéro et Rue */}
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Ex: 15 Rue de la Paix, Paris"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    onFocus={() => setFocusedField('location')}
+                    placeholder="N°"
+                    value={numero}
+                    onChange={(e) => setNumero(e.target.value)}
+                    onFocus={() => setFocusedField('numero')}
+                    onBlur={() => setFocusedField(null)}
+                    className={cn(
+                      "bg-secondary border-border transition-all duration-200 w-20",
+                      focusedField === 'numero' && "ring-2 ring-primary/50 border-primary"
+                    )}
+                  />
+                  <Input
+                    placeholder="Rue *"
+                    value={rue}
+                    onChange={(e) => setRue(e.target.value)}
+                    onFocus={() => setFocusedField('rue')}
                     onBlur={() => setFocusedField(null)}
                     className={cn(
                       "bg-secondary border-border transition-all duration-200 flex-1",
-                      focusedField === 'location' && "ring-2 ring-primary/50 border-primary"
+                      focusedField === 'rue' && "ring-2 ring-primary/50 border-primary"
                     )}
                   />
+                </div>
+                
+                {/* Code Postal et Ville */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Code postal"
+                    value={codePostal}
+                    onChange={(e) => setCodePostal(e.target.value)}
+                    onFocus={() => setFocusedField('codePostal')}
+                    onBlur={() => setFocusedField(null)}
+                    className={cn(
+                      "bg-secondary border-border transition-all duration-200 w-28",
+                      focusedField === 'codePostal' && "ring-2 ring-primary/50 border-primary"
+                    )}
+                  />
+                  <Input
+                    placeholder="Ville *"
+                    value={ville}
+                    onChange={(e) => setVille(e.target.value)}
+                    onFocus={() => setFocusedField('ville')}
+                    onBlur={() => setFocusedField(null)}
+                    className={cn(
+                      "bg-secondary border-border transition-all duration-200 flex-1",
+                      focusedField === 'ville' && "ring-2 ring-primary/50 border-primary"
+                    )}
+                  />
+                </div>
+                
+                {/* GPS Button */}
+                {fullAddress && (
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
+                    size="sm"
                     onClick={openGPSNavigation}
-                    disabled={!location.trim()}
-                    className={cn(
-                      "shrink-0 transition-all duration-200",
-                      location.trim() && "text-blue-500 border-blue-500/50 hover:bg-blue-500/10"
-                    )}
-                    title="Ouvrir le trajet GPS"
+                    className="w-full text-blue-500 border-blue-500/50 hover:bg-blue-500/10"
                   >
-                    <Navigation className="w-4 h-4" />
+                    <Navigation className="w-4 h-4 mr-2" />
+                    Ouvrir le trajet GPS
                   </Button>
-                </div>
-                {location.trim() && (
-                  <p className="text-xs text-blue-500 flex items-center gap-1">
-                    <Navigation className="w-3 h-3" />
-                    Cliquez sur l'icône pour ouvrir le trajet GPS
-                  </p>
                 )}
               </div>
               
