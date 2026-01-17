@@ -6,27 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function base64UrlToUint8Array(base64Url: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
-  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-function uint8ArrayToBase64Url(uint8Array: Uint8Array): string {
+function base64UrlEncode(data: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < uint8Array.length; i++) {
-    binary += String.fromCharCode(uint8Array[i]);
+  for (let i = 0; i < data.length; i++) {
+    binary += String.fromCharCode(data[i]);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-function base64UrlEncode(str: string): string {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 serve(async (req) => {
@@ -38,60 +23,137 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY') || '';
+    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY') || '';
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
+    // Get the authenticated user from the request
+    const authHeader = req.headers.get('Authorization');
+    let senderUserId: string | null = null;
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      senderUserId = user?.id || null;
+    }
+    
     const { title, body, urgency, interventionId, type, organizationId, excludeUserId } = await req.json();
     
-    console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId });
+    console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId, senderUserId });
 
-    let subscriptionsQuery = supabase
-      .from('push_subscriptions')
-      .select('*, profiles!inner(invite_code_id, admin_id, user_id)');
+    let userIdsToNotify: string[] = [];
     
-    // For chat notifications, only notify users in the same organization
     if (type === 'chat' && organizationId) {
-      // Get users in this organization (employees with this invite_code_id or admin who created it)
+      // For chat notifications, notify users in the same organization
       const { data: orgProfiles } = await supabase
         .from('profiles')
         .select('user_id')
         .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
       
-      const userIds = (orgProfiles || []).map(p => p.user_id).filter(id => id !== excludeUserId);
+      userIdsToNotify = (orgProfiles || [])
+        .map(p => p.user_id)
+        .filter(id => id !== excludeUserId);
+        
+    } else if (senderUserId) {
+      // For intervention alerts, get the sender's organization and notify all members
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('invite_code_id, admin_id')
+        .eq('user_id', senderUserId)
+        .single();
       
-      if (userIds.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No users to notify', total: 0, successful: 0 }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      console.log('Sender profile:', senderProfile);
+      
+      if (senderProfile) {
+        // Check if sender is an admin (has admin_id set to their invite_code_id)
+        const { data: adminCheck } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', senderUserId)
+          .eq('role', 'admin')
+          .single();
+        
+        let orgId: string | null = null;
+        
+        if (adminCheck) {
+          // Sender is admin - get their invite code ID
+          const { data: inviteCode } = await supabase
+            .from('invite_codes')
+            .select('id')
+            .eq('admin_id', senderUserId)
+            .single();
+          
+          orgId = inviteCode?.id || null;
+          console.log('Admin org ID:', orgId);
+        } else {
+          // Sender is employee - use their invite_code_id
+          orgId = senderProfile.invite_code_id;
+          console.log('Employee org ID:', orgId);
+        }
+        
+        if (orgId) {
+          // Get all users in this organization (employees + admin)
+          const { data: orgMembers } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .or(`invite_code_id.eq.${orgId}`);
+          
+          // Also get the admin
+          const { data: adminProfile } = await supabase
+            .from('invite_codes')
+            .select('admin_id')
+            .eq('id', orgId)
+            .single();
+          
+          const memberIds = (orgMembers || []).map(p => p.user_id);
+          if (adminProfile?.admin_id) {
+            memberIds.push(adminProfile.admin_id);
+          }
+          
+          // Exclude the sender
+          userIdsToNotify = [...new Set(memberIds)].filter(id => id !== senderUserId);
+          console.log('Users to notify:', userIdsToNotify.length);
+        }
       }
-
-      subscriptionsQuery = supabase
+    } else {
+      // Fallback: notify all subscribed users (for testing)
+      console.log('No sender identified, sending to all subscriptions');
+      const { data: allSubs } = await supabase
         .from('push_subscriptions')
-        .select('*')
-        .in('user_id', userIds);
+        .select('user_id');
+      
+      userIdsToNotify = [...new Set((allSubs || []).map(s => s.user_id))];
+    }
+    
+    if (userIdsToNotify.length === 0) {
+      console.log('No users to notify');
+      return new Response(
+        JSON.stringify({ message: 'No users to notify', total: 0, successful: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const { data: subscriptions, error: subError } = await subscriptionsQuery;
+    // Get push subscriptions for these users
+    const { data: subscriptions, error: subError } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .in('user_id', userIdsToNotify);
 
     if (subError) {
       console.error('Error fetching subscriptions:', subError);
       throw subError;
     }
 
-    // Filter out the sender for chat messages
-    const filteredSubscriptions = excludeUserId 
-      ? (subscriptions || []).filter(s => s.user_id !== excludeUserId)
-      : subscriptions;
-
-    console.log(`Found ${filteredSubscriptions?.length || 0} subscriptions to notify`);
+    console.log(`Found ${subscriptions?.length || 0} subscriptions to notify`);
 
     const payload = JSON.stringify({
       title,
       body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      tag: type === 'chat' ? `chat-${organizationId}` : interventionId,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      tag: type === 'chat' ? `chat-${organizationId}` : `intervention-${interventionId}`,
+      requireInteraction: urgency === 'high',
       data: {
         interventionId,
         urgency,
@@ -100,12 +162,19 @@ serve(async (req) => {
       },
     });
 
-    // Send to all subscriptions using simple fetch
+    // Send to all subscriptions
     const results = await Promise.allSettled(
-      (filteredSubscriptions || []).map(async (sub) => {
+      (subscriptions || []).map(async (sub) => {
         try {
           console.log('Sending to endpoint:', sub.endpoint.substring(0, 60));
           
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Encoding': 'aes128gcm',
+            'TTL': '86400',
+          };
+
+          // Simple push without encryption for now (works for testing)
           const response = await fetch(sub.endpoint, {
             method: 'POST',
             headers: {
@@ -129,7 +198,7 @@ serve(async (req) => {
             throw new Error(`Push failed: ${response.status}`);
           }
 
-          console.log('Push sent successfully');
+          console.log('Push sent successfully to user:', sub.user_id);
           return { success: true };
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -141,11 +210,14 @@ serve(async (req) => {
 
     const successful = results.filter(r => r.status === 'fulfilled' && (r.value as { success: boolean }).success).length;
     
+    console.log(`Notifications sent: ${successful}/${subscriptions?.length || 0}`);
+    
     return new Response(
       JSON.stringify({ 
         message: 'Notifications sent',
         total: subscriptions?.length || 0,
         successful,
+        usersNotified: userIdsToNotify.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
