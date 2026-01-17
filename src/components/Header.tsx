@@ -26,7 +26,7 @@ export const Header = () => {
         <div className="flex items-center gap-3">
           <img src={logo} alt="MEDICBIKE Logo" className="w-10 h-10 rounded-full object-cover" />
           <div>
-            <h1 className="font-bold text-lg text-foreground">MEDICBIKE</h1>
+            <h1 className="font-bold text-lg text-foreground whitespace-nowrap">MEDICBIKE</h1>
             <p className="text-xs text-muted-foreground">
               {isAdmin ? 'Administrateur' : 'Alertes en cours'}
             </p>
