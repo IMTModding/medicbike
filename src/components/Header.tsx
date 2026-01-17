@@ -27,7 +27,7 @@ export const Header = () => {
             <Bell className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-lg text-foreground">Interventions</h1>
+            <h1 className="font-bold text-lg text-foreground">MEDICBIKE</h1>
             <p className="text-xs text-muted-foreground">
               {isAdmin ? 'Administrateur' : 'Alertes en cours'}
             </p>
