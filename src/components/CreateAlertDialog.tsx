@@ -149,7 +149,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
         </Button>
       </DialogTrigger>
       <DialogContent className={cn(
-        "bg-card border-border max-w-md mx-4 max-h-[90vh] overflow-y-auto",
+        "bg-card border-border w-[calc(100vw-2rem)] sm:max-w-md max-h-[85vh] overflow-y-auto",
         "animate-in fade-in-0 zoom-in-95 duration-300"
       )}>
         {success ? (
