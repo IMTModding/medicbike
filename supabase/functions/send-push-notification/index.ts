@@ -28,15 +28,26 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Get the authenticated user from the request
+    // Require authentication
     const authHeader = req.headers.get('Authorization');
-    let senderUserId: string | null = null;
-    
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      senderUserId = user?.id || null;
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const senderUserId = user.id;
     
     const { title, body, urgency, interventionId, type, organizationId, excludeUserId } = await req.json();
     
@@ -116,14 +127,6 @@ serve(async (req) => {
           console.log('Users to notify:', userIdsToNotify.length);
         }
       }
-    } else {
-      // Fallback: notify all subscribed users (for testing)
-      console.log('No sender identified, sending to all subscriptions');
-      const { data: allSubs } = await supabase
-        .from('push_subscriptions')
-        .select('user_id');
-      
-      userIdsToNotify = [...new Set((allSubs || []).map(s => s.user_id))];
     }
     
     if (userIdsToNotify.length === 0) {
