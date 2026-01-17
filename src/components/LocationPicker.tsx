@@ -75,7 +75,7 @@ export const LocationPicker = ({ latitude, longitude, onLocationChange }: Locati
         </Button>
       </div>
       
-      <div className="relative h-48 rounded-lg overflow-hidden border border-border">
+      <div className="relative h-48 rounded-lg overflow-hidden border border-border" style={{ zIndex: 0 }}>
         <MapContainer
           center={center}
           zoom={latitude && longitude ? 15 : 12}
