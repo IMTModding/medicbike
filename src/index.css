@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet CSS fix for dialogs */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control {
+  z-index: 0 !important;
+}
+
+.leaflet-container {
+  z-index: 0 !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @layer base {
