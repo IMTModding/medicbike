@@ -1,6 +1,26 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+// Prefer a build-time key (when configured), otherwise fetch it from the backend.
+let cachedVapidPublicKey: string | null = null;
+const VITE_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+
+async function getVapidPublicKey(): Promise<string> {
+  if (cachedVapidPublicKey) return cachedVapidPublicKey;
+  if (VITE_VAPID_PUBLIC_KEY) {
+    cachedVapidPublicKey = VITE_VAPID_PUBLIC_KEY;
+    return cachedVapidPublicKey;
+  }
+
+  const { data, error } = await supabase.functions.invoke('vapid-public-key');
+  if (error) {
+    console.error('Unable to fetch VAPID public key:', error);
+    return '';
+  }
+
+  const key = (data as any)?.publicKey || '';
+  cachedVapidPublicKey = key;
+  return key;
+}
 
 export const isPushSupported = (): boolean => {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -74,15 +94,21 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
 
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();
-    
-    if (!subscription && VAPID_PUBLIC_KEY) {
+
+    const vapidPublicKey = await getVapidPublicKey();
+
+    if (!subscription && vapidPublicKey) {
       // Create new subscription with properly typed applicationServerKey
-      const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
       });
       console.log('Push subscription created:', subscription);
+    }
+
+    if (!subscription && !vapidPublicKey) {
+      console.warn('VAPID public key missing; cannot subscribe to push');
     }
 
     if (subscription) {
