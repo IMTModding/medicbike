@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
+import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Map } from 'lucide-react';
 import { createIntervention, Urgency } from '@/services/interventions';
 import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { LocationPicker } from './LocationPicker';
 import { cn } from '@/lib/utils';
+
+// Lazy load LocationPicker to avoid Leaflet issues on mobile
+const LocationPicker = lazy(() => import('./LocationPicker').then(m => ({ default: m.LocationPicker })));
 
 interface CreateAlertDialogProps {
   onCreated: () => void;
@@ -54,6 +55,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
   
   const { user } = useAuth();
 
@@ -122,6 +124,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setLoading(false);
     setSuccess(false);
     setFocusedField(null);
+    setShowMap(false);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -226,11 +229,39 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 />
               </div>
               
-              <LocationPicker
-                latitude={latitude}
-                longitude={longitude}
-                onLocationChange={handleLocationChange}
-              />
+              {/* GPS Location - Optional */}
+              <div className="space-y-2">
+                {!showMap ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMap(true)}
+                    className="w-full"
+                  >
+                    <Map className="w-4 h-4 mr-2" />
+                    Ajouter une position GPS (optionnel)
+                  </Button>
+                ) : (
+                  <Suspense fallback={
+                    <div className="h-48 rounded-lg bg-secondary flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  }>
+                    <LocationPicker
+                      latitude={latitude}
+                      longitude={longitude}
+                      onLocationChange={handleLocationChange}
+                    />
+                  </Suspense>
+                )}
+                {latitude && longitude && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    Position: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                  </p>
+                )}
+              </div>
               
               {/* Description Field */}
               <div className={cn(
