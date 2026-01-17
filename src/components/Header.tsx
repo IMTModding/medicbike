@@ -1,6 +1,7 @@
 import { Bell, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { NotificationToggle } from '@/components/NotificationToggle';
 
 export const Header = () => {
   const { signOut, role } = useAuth();
@@ -26,7 +27,8 @@ export const Header = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <NotificationToggle />
           {role === 'admin' && (
             <button 
               onClick={() => navigate('/admin')}
