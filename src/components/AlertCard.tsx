@@ -98,13 +98,21 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
       )}
 
       {/* Location with GPS Button */}
-      <button 
-        onClick={openGPSNavigation}
-        className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 mb-4 w-full text-left transition-colors group"
-      >
-        <Navigation className="w-4 h-4 shrink-0 group-hover:scale-110 transition-transform" />
-        <span className="truncate underline underline-offset-2">{intervention.location}</span>
-      </button>
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="w-4 h-4 text-primary shrink-0" />
+          <span className="truncate">{intervention.location}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openGPSNavigation}
+          className="w-full text-blue-400 border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300"
+        >
+          <Navigation className="w-4 h-4 mr-2" />
+          Ouvrir le trajet GPS
+        </Button>
+      </div>
 
       {/* Action Buttons */}
       {isResponded ? (
