@@ -13,6 +13,7 @@ import StatsPage from "./pages/StatsPage";
 import AvailabilityPage from "./pages/AvailabilityPage";
 import ProfilePage from "./pages/ProfilePage";
 import ChatPage from "./pages/ChatPage";
+import InviteCodesPage from "./pages/InviteCodesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/availability" element={<AvailabilityPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/chat/:interventionId" element={<ChatPage />} />
+            <Route path="/invite-codes" element={<InviteCodesPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
