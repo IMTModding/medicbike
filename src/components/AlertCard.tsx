@@ -1,6 +1,6 @@
 import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Intervention } from '@/data/interventions';
+import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
 
 interface AlertCardProps {
@@ -31,7 +31,8 @@ const getUrgencyConfig = (urgency: Intervention['urgency']) => {
   }
 };
 
-const getTimeAgo = (date: Date) => {
+const getTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -47,9 +48,9 @@ const getTimeAgo = (date: Date) => {
 
 export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
-  const timeAgo = getTimeAgo(intervention.createdAt);
+  const timeAgo = getTimeAgo(intervention.created_at);
   
-  const isResponded = intervention.status === 'available' || intervention.status === 'unavailable';
+  const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
 
   return (
     <div 
@@ -82,9 +83,11 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
         )}
         {intervention.title}
       </h3>
-      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-        {intervention.description}
-      </p>
+      {intervention.description && (
+        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+          {intervention.description}
+        </p>
+      )}
 
       {/* Location */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
@@ -96,11 +99,11 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
       {isResponded ? (
         <div className={cn(
           "flex items-center justify-center gap-2 py-3 rounded-lg",
-          intervention.status === 'available' 
+          intervention.userStatus === 'available' 
             ? "bg-success/10 text-success" 
             : "bg-muted text-muted-foreground"
         )}>
-          {intervention.status === 'available' ? (
+          {intervention.userStatus === 'available' ? (
             <>
               <CheckCircle2 className="w-5 h-5" />
               <span className="font-medium">Vous êtes disponible</span>
