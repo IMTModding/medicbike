@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogOut, LayoutDashboard, History, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper, Settings, Home } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -56,6 +56,14 @@ export const Header = () => {
         </div>
         
         <div className="flex items-center gap-1 sm:gap-1.5">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary flex items-center justify-center transition-colors hover:bg-primary/90 shrink-0"
+            title="Accueil"
+          >
+            <Home className="w-4 h-4 text-primary-foreground" />
+          </button>
+          
           <NotificationToggle />
           
           <button 
