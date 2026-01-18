@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -14,7 +14,9 @@ import {
   Calendar,
   Filter,
   Loader2,
-  History
+  History,
+  Search,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,14 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ExportHistoryDialog from '@/components/ExportHistoryDialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
 const getUrgencyConfig = (urgency: string) => {
   switch (urgency) {
     case 'high':
@@ -54,6 +64,8 @@ const HistoryPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -94,7 +106,28 @@ const HistoryPage = () => {
   const handleClearFilters = () => {
     setStartDate('');
     setEndDate('');
+    setSearchQuery('');
+    setUrgencyFilter('all');
   };
+
+  // Filtered interventions based on search and urgency
+  const filteredInterventions = useMemo(() => {
+    return interventions.filter(intervention => {
+      // Search filter
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        intervention.title.toLowerCase().includes(searchLower) ||
+        intervention.location.toLowerCase().includes(searchLower) ||
+        (intervention.description?.toLowerCase().includes(searchLower));
+      
+      // Urgency filter
+      const matchesUrgency = urgencyFilter === 'all' || intervention.urgency === urgencyFilter;
+      
+      return matchesSearch && matchesUrgency;
+    });
+  }, [interventions, searchQuery, urgencyFilter]);
+
+  const hasActiveFilters = searchQuery || urgencyFilter !== 'all' || startDate || endDate;
 
   if (authLoading || loading) {
     return (
@@ -141,13 +174,53 @@ const HistoryPage = () => {
       </header>
 
       <main className="container px-4 py-6">
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par titre, lieu..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10 bg-secondary border-border"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
         {/* Filters Panel */}
         {showFilters && (
           <div className="bg-card rounded-xl border border-border p-4 mb-6 slide-up">
             <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Filtrer par date
+              <Filter className="w-4 h-4" />
+              Filtres avancés
             </h3>
+            
+            {/* Urgency Filter */}
+            <div className="mb-4">
+              <label className="text-xs text-muted-foreground mb-1.5 block">Niveau d'urgence</label>
+              <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Tous les niveaux" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les niveaux</SelectItem>
+                  <SelectItem value="high">Urgent</SelectItem>
+                  <SelectItem value="medium">Moyen</SelectItem>
+                  <SelectItem value="low">Normal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <h4 className="font-medium text-foreground mb-3 flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4" />
+              Période
+            </h4>
             
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -176,8 +249,9 @@ const HistoryPage = () => {
                 size="sm"
                 onClick={handleClearFilters}
                 className="flex-1"
+                disabled={!hasActiveFilters}
               >
-                Effacer
+                Effacer tout
               </Button>
               <Button
                 size="sm"
@@ -198,8 +272,11 @@ const HistoryPage = () => {
                 <CheckCircle2 className="w-5 h-5 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{interventions.length}</p>
-                <p className="text-sm text-muted-foreground">intervention{interventions.length > 1 ? 's' : ''} terminée{interventions.length > 1 ? 's' : ''}</p>
+                <p className="text-2xl font-bold text-foreground">{filteredInterventions.length}</p>
+                <p className="text-sm text-muted-foreground">
+                  intervention{filteredInterventions.length > 1 ? 's' : ''} 
+                  {filteredInterventions.length !== interventions.length && ` (sur ${interventions.length})`}
+                </p>
               </div>
             </div>
             {(startDate || endDate) && (
@@ -213,7 +290,7 @@ const HistoryPage = () => {
 
         {/* Interventions List */}
         <div className="space-y-4">
-          {interventions.map(intervention => {
+          {filteredInterventions.map(intervention => {
             const urgencyConfig = getUrgencyConfig(intervention.urgency);
             const availableCount = intervention.responses.filter(r => r.status === 'available').length;
             const completedDate = intervention.completed_at 
@@ -313,18 +390,22 @@ const HistoryPage = () => {
         </div>
 
         {/* Empty State */}
-        {interventions.length === 0 && (
+        {filteredInterventions.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <History className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-semibold text-foreground mb-2">Aucun historique</h3>
+            <h3 className="font-semibold text-foreground mb-2">
+              {interventions.length === 0 ? 'Aucun historique' : 'Aucun résultat'}
+            </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              {startDate || endDate 
-                ? 'Aucune intervention terminée pour cette période'
-                : 'Aucune intervention terminée pour le moment'}
+              {interventions.length === 0
+                ? (startDate || endDate 
+                    ? 'Aucune intervention terminée pour cette période'
+                    : 'Aucune intervention terminée pour le moment')
+                : 'Aucune intervention ne correspond à vos critères de recherche'}
             </p>
-            {(startDate || endDate) && (
+            {hasActiveFilters && (
               <Button variant="secondary" onClick={handleClearFilters}>
                 Effacer les filtres
               </Button>
