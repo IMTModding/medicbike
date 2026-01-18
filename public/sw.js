@@ -1,48 +1,62 @@
 /// <reference lib="webworker" />
 
-declare const self: ServiceWorkerGlobalScope;
+// This service worker is the SINGLE SW used by the app.
+// It supports:
+// - Workbox precaching (injected at build time)
+// - Push notifications
+// - Immediate activation on updates
 
-const CACHE_VERSION = 'v2-' + Date.now();
-const CACHE_NAME = 'medicbike-cache-' + CACHE_VERSION;
+declare const self: ServiceWorkerGlobalScope & {
+  __WB_MANIFEST?: any;
+};
 
-self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...', CACHE_VERSION);
-  self.skipWaiting();
-});
+// Load Workbox (CDN)
+importScripts("https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js");
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+// @ts-ignore
+const wb = (self as any).workbox;
+
+if (wb) {
+  // Ensure new SW takes control ASAP
+  wb.core.skipWaiting();
+  wb.core.clientsClaim();
+
+  // Precache app shell/assets (manifest injected by vite-plugin-pwa)
+  wb.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+
+  // Navigation requests: try network first, fall back to cached app shell
+  wb.routing.registerRoute(
+    ({ request }) => request.mode === "navigate",
+    new wb.strategies.NetworkFirst({
+      cacheName: "pages",
+      networkTimeoutSeconds: 3,
+    })
+  );
+
+  // API calls to backend: network first with short cache
+  wb.routing.registerRoute(
+    ({ url }) => url.origin.includes("supabase.co"),
+    new wb.strategies.NetworkFirst({
+      cacheName: "backend",
+      networkTimeoutSeconds: 5,
+    })
+  );
+}
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker activated', CACHE_VERSION);
-  // Delete old caches
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name.startsWith('medicbike-cache-') && name !== CACHE_NAME)
-          .map((name) => {
-            console.log('Deleting old cache:', name);
-            return caches.delete(name);
-          })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('push', (event) => {
-  console.log('Push event received:', event);
-  
+self.addEventListener("push", (event) => {
   let data = {
-    title: 'Nouvelle intervention',
-    body: 'Une nouvelle alerte a été créée',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: 'intervention',
-    data: { url: '/' },
+    title: "Nouvelle intervention",
+    body: "Une nouvelle alerte a été créée",
+    icon: "/favicon.ico",
+    badge: "/favicon.ico",
+    tag: "intervention",
+    data: { url: "/" },
   };
 
   try {
@@ -50,8 +64,8 @@ self.addEventListener('push', (event) => {
       const payload = event.data.json();
       data = { ...data, ...payload };
     }
-  } catch (e) {
-    console.error('Error parsing push data:', e);
+  } catch {
+    // ignore
   }
 
   const options: NotificationOptions = {
@@ -64,32 +78,25 @@ self.addEventListener('push', (event) => {
     data: data.data,
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-self.addEventListener('notificationclick', (event) => {
-  console.log('Notification clicked:', event);
-  
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  
-  const url = event.notification.data?.url || '/';
-  
+
+  const url = (event.notification as any).data?.url || "/";
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return (client as WindowClient).focus();
         }
       }
-      // Otherwise open a new window
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
-      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });
 
 export {};
+
