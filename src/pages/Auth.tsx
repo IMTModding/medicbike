@@ -34,7 +34,7 @@ const Auth = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       emailSchema.parse(email);
     } catch (err) {
@@ -43,20 +43,23 @@ const Auth = () => {
         return;
       }
     }
-    
+
     setLoading(true);
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+
+    const { error: fnError } = await supabase.functions.invoke('send-password-recovery', {
+      body: {
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
+      },
     });
-    
-    if (error) {
-      setError(error.message);
+
+    if (fnError) {
+      setError("Impossible d'envoyer l'email pour le moment");
     } else {
       setResetEmailSent(true);
       toast.success('Email de réinitialisation envoyé !');
     }
-    
+
     setLoading(false);
   };
 
