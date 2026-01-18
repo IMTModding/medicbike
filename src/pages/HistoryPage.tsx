@@ -130,17 +130,24 @@ const HistoryPage = () => {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    
+
     setDeleting(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('interventions')
         .delete()
-        .in('id', Array.from(selectedIds));
+        .in('id', Array.from(selectedIds))
+        .select('id');
 
       if (error) throw error;
 
-      toast.success(`${selectedIds.size} intervention(s) supprimée(s)`);
+      const deletedCount = data?.length ?? 0;
+      if (deletedCount === 0) {
+        toast.error("Suppression refusée (droits insuffisants)");
+        return;
+      }
+
+      toast.success(`${deletedCount} intervention(s) supprimée(s)`);
       setSelectedIds(new Set());
       setSelectionMode(false);
       refetch();
@@ -171,6 +178,12 @@ const HistoryPage = () => {
   }, [interventions, searchQuery, urgencyFilter]);
 
   const hasActiveFilters = searchQuery || urgencyFilter !== 'all' || appliedStartDate || appliedEndDate;
+
+  const canDelete = useMemo(() => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    return filteredInterventions.some((i: any) => i.created_by === user.id);
+  }, [filteredInterventions, isAdmin, user]);
 
   if (authLoading) {
     return (
@@ -253,7 +266,7 @@ const HistoryPage = () => {
             ) : (
               <>
                 <ExportHistoryDialog startDate={appliedStartDate} endDate={appliedEndDate} />
-                {isAdmin && (
+                {canDelete && (
                   <Button
                     variant="secondary"
                     size="icon"
