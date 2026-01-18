@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { recordLogin } from '@/hooks/useLoginHistory';
 
 type UserRole = 'admin' | 'employee';
 
@@ -133,10 +134,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    
+    // Record login on successful sign in
+    if (!error && data.user) {
+      recordLogin(data.user.id);
+    }
     
     return { error };
   };

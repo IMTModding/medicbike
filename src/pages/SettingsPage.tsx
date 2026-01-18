@@ -1,17 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
-import { ArrowLeft, Moon, Sun, Bell, User, Shield, LogOut } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Bell, User, Shield, LogOut, History, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
+import LoginHistoryDialog from '@/components/LoginHistoryDialog';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
   const { user, signOut, isAdmin } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [showLoginHistory, setShowLoginHistory] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -26,6 +28,12 @@ const SettingsPage = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleResetOnboarding = () => {
+    // This would reset onboarding to show again
+    localStorage.removeItem('onboarding_completed');
+    window.location.reload();
   };
 
   if (!mounted) return null;
@@ -120,6 +128,44 @@ const SettingsPage = () => {
           </div>
         </div>
 
+        {/* Sécurité */}
+        <div className="bg-card rounded-xl border border-border p-4">
+          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            Sécurité
+          </h2>
+          
+          <div className="space-y-3">
+            <Button 
+              variant="secondary" 
+              className="w-full justify-start"
+              onClick={() => setShowLoginHistory(true)}
+            >
+              <History className="w-4 h-4 mr-2" />
+              Historique des connexions
+            </Button>
+          </div>
+        </div>
+
+        {/* Aide */}
+        <div className="bg-card rounded-xl border border-border p-4">
+          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5" />
+            Aide
+          </h2>
+          
+          <div className="space-y-3">
+            <Button 
+              variant="secondary" 
+              className="w-full justify-start"
+              onClick={handleResetOnboarding}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Revoir le tutoriel
+            </Button>
+          </div>
+        </div>
+
         <Separator />
 
         {/* Déconnexion */}
@@ -137,6 +183,12 @@ const SettingsPage = () => {
           MEDICBIKE v1.0.0
         </p>
       </main>
+
+      {/* Login History Dialog */}
+      <LoginHistoryDialog 
+        open={showLoginHistory} 
+        onOpenChange={setShowLoginHistory} 
+      />
     </div>
   );
 };

@@ -206,6 +206,36 @@ export type Database = {
         }
         Relationships: []
       }
+      login_history: {
+        Row: {
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          location: string | null
+          login_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          location?: string | null
+          login_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          location?: string | null
+          login_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       news: {
         Row: {
           admin_id: string
@@ -247,6 +277,7 @@ export type Database = {
           full_name: string | null
           id: string
           invite_code_id: string | null
+          onboarding_completed: boolean | null
           phone: string | null
           user_id: string
         }
@@ -257,6 +288,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
+          onboarding_completed?: boolean | null
           phone?: string | null
           user_id: string
         }
@@ -267,6 +299,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
+          onboarding_completed?: boolean | null
           phone?: string | null
           user_id?: string
         }
