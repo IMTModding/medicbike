@@ -25,6 +25,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import InviteUserDialog from '@/components/InviteUserDialog';
 import CreateInviteCodeDialog from '@/components/CreateInviteCodeDialog';
+import ResetPasswordDialog from '@/components/ResetPasswordDialog';
 
 interface Employee {
   id: string;
@@ -58,6 +59,7 @@ const EmployeesPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [todayAvailabilities, setTodayAvailabilities] = useState<Map<string, Availability>>(new Map());
+  const [resetPasswordEmployee, setResetPasswordEmployee] = useState<Employee | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -453,6 +455,15 @@ const EmployeesPage = () => {
                             </Button>
                           </>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={() => setResetPasswordEmployee(employee)}
+                          title="Réinitialiser le mot de passe"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -494,6 +505,17 @@ const EmployeesPage = () => {
           )}
         </div>
       </main>
+
+      {/* Reset Password Dialog */}
+      {resetPasswordEmployee && (
+        <ResetPasswordDialog
+          open={!!resetPasswordEmployee}
+          onOpenChange={(open) => !open && setResetPasswordEmployee(null)}
+          userId={resetPasswordEmployee.user_id}
+          userName={resetPasswordEmployee.full_name || 'Employé'}
+          userEmail={resetPasswordEmployee.email}
+        />
+      )}
     </div>
   );
 };
