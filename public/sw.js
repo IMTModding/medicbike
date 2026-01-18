@@ -1,20 +1,14 @@
-/// <reference lib="webworker" />
-
-// This service worker is the SINGLE SW used by the app.
-// It supports:
+// Service Worker for MEDICBIKE PWA
+// Supports:
 // - Workbox precaching (injected at build time)
 // - Push notifications
 // - Immediate activation on updates
-
-declare const self: ServiceWorkerGlobalScope & {
-  __WB_MANIFEST?: any;
-};
 
 // Load Workbox (CDN)
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js");
 
 // @ts-ignore
-const wb = (self as any).workbox;
+var wb = self.workbox;
 
 if (wb) {
   // Ensure new SW takes control ASAP
@@ -26,7 +20,7 @@ if (wb) {
 
   // Navigation requests: try network first, fall back to cached app shell
   wb.routing.registerRoute(
-    ({ request }) => request.mode === "navigate",
+    function(options) { return options.request.mode === "navigate"; },
     new wb.strategies.NetworkFirst({
       cacheName: "pages",
       networkTimeoutSeconds: 3,
@@ -35,7 +29,7 @@ if (wb) {
 
   // API calls to backend: network first with short cache
   wb.routing.registerRoute(
-    ({ url }) => url.origin.includes("supabase.co"),
+    function(options) { return options.url.origin.includes("supabase.co"); },
     new wb.strategies.NetworkFirst({
       cacheName: "backend",
       networkTimeoutSeconds: 5,
@@ -43,14 +37,14 @@ if (wb) {
   );
 }
 
-self.addEventListener("message", (event) => {
+self.addEventListener("message", function(event) {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
-self.addEventListener("push", (event) => {
-  let data = {
+self.addEventListener("push", function(event) {
+  var data = {
     title: "Nouvelle intervention",
     body: "Une nouvelle alerte a été créée",
     icon: "/favicon.ico",
@@ -61,14 +55,14 @@ self.addEventListener("push", (event) => {
 
   try {
     if (event.data) {
-      const payload = event.data.json();
-      data = { ...data, ...payload };
+      var payload = event.data.json();
+      data = Object.assign({}, data, payload);
     }
-  } catch {
+  } catch (e) {
     // ignore
   }
 
-  const options: NotificationOptions = {
+  var options = {
     body: data.body,
     icon: data.icon,
     badge: data.badge,
@@ -81,22 +75,20 @@ self.addEventListener("push", (event) => {
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-self.addEventListener("notificationclick", (event) => {
+self.addEventListener("notificationclick", function(event) {
   event.notification.close();
 
-  const url = (event.notification as any).data?.url || "/";
+  var url = (event.notification.data && event.notification.data.url) || "/";
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
         if (client.url.includes(self.location.origin) && "focus" in client) {
-          return (client as WindowClient).focus();
+          return client.focus();
         }
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });
-
-export {};
-
