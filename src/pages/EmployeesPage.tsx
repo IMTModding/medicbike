@@ -168,15 +168,11 @@ const EmployeesPage = () => {
       return;
     }
 
-    const codeIds = codes.map((c) => c.id);
     const codeMap = new Map(codes.map((c) => [c.id, c.organization_name]));
 
-    // Fetch profiles linked to these invite codes
+    // Use secure function to fetch profiles with proper phone visibility
     const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('*')
-      .in('invite_code_id', codeIds)
-      .order('created_at', { ascending: false });
+      .rpc('get_organization_profiles', { p_user_id: user.id });
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
@@ -184,12 +180,12 @@ const EmployeesPage = () => {
       return;
     }
 
-    const employeesData: Employee[] = (profiles || []).map((profile) => ({
+    const employeesData: Employee[] = (profiles || []).map((profile: any) => ({
       id: profile.id,
       user_id: profile.user_id,
       full_name: profile.full_name,
       avatar_url: profile.avatar_url,
-      phone: profile.phone,
+      phone: profile.phone, // Now properly filtered by the secure function
       created_at: profile.created_at,
       invite_code_id: profile.invite_code_id,
       organization_name: profile.invite_code_id
