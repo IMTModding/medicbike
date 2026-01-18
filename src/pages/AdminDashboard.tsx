@@ -19,11 +19,13 @@ import {
   Trash2,
   Users,
   Loader2,
-  Check
+  Check,
+  Map
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import TeamLocationMap from '@/components/TeamLocationMap';
 
 const getUrgencyConfig = (urgency: string) => {
   switch (urgency) {
@@ -73,6 +75,7 @@ const AdminDashboard = () => {
   const [interventions, setInterventions] = useState<InterventionWithResponses[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
   
   const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
@@ -214,14 +217,31 @@ const AdminDashboard = () => {
         </div>
 
         {/* Quick Links */}
-        <Button
-          variant="secondary"
-          className="w-full mb-6"
-          onClick={() => navigate('/history')}
-        >
-          <Clock className="w-4 h-4 mr-2" />
-          Voir l'historique des interventions
-        </Button>
+        <div className="flex gap-2 mb-6">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            onClick={() => navigate('/history')}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            Historique
+          </Button>
+          <Button
+            variant={showMap ? 'default' : 'secondary'}
+            className="flex-1"
+            onClick={() => setShowMap(!showMap)}
+          >
+            <Map className="w-4 h-4 mr-2" />
+            {showMap ? 'Masquer carte' : 'Voir équipe'}
+          </Button>
+        </div>
+
+        {/* Team Location Map */}
+        {showMap && (
+          <div className="mb-6">
+            <TeamLocationMap />
+          </div>
+        )}
 
         {/* Interventions List */}
         <div className="space-y-4">
