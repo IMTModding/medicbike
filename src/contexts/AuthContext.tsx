@@ -24,7 +24,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initError, setInitError] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
 
   const fetchUserRole = async (userId: string) => {
@@ -48,15 +47,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // If auth init hangs (offline, blocked storage, etc.), don't keep users stuck.
+    // Increase timeout to 15 seconds for slow mobile networks
     const timeoutId = window.setTimeout(() => {
       if (!isMounted) return;
-      setInitError((prev) =>
-        prev ??
-        "Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez."
-      );
+      // Don't set error - just finish loading and let user proceed
+      // This prevents blocking users on slow connections
       setLoading(false);
-    }, 8000);
+    }, 15000);
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -80,7 +77,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!isMounted) return;
 
         window.clearTimeout(timeoutId);
-        setInitError(null);
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -91,11 +87,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         if (!isMounted) return;
         window.clearTimeout(timeoutId);
-        // Keep a single, consistent message for all init failures
-        setInitError((prev) =>
-          prev ??
-          "Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez."
-        );
+        // Don't block - let user continue to login page
+        console.warn('Auth init error:', e);
       } finally {
         if (!isMounted) return;
         setLoading(false);
@@ -192,44 +185,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAdmin = role === 'admin';
 
-  const allowRenderWhileLoading =
-    typeof window !== 'undefined' &&
-    (window.location.pathname.startsWith('/auth') ||
-      window.location.pathname.startsWith('/reset-password'));
-
-  // If auth initialization failed (timeout/offline), show a clear retry screen
-  if (initError && !allowRenderWhileLoading) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 p-6">
-        <div className="flex flex-col items-center gap-3">
-          <img
-            src={logo}
-            alt="MEDICBIKE"
-            className="w-20 h-20 rounded-full object-cover shadow-lg"
-          />
-          <div className="text-center">
-            <h1 className="font-bold text-xl text-foreground">MEDICBIKE</h1>
-            <p className="text-sm text-muted-foreground">Unité Médicale Motocycliste</p>
-          </div>
-        </div>
-
-        <div className="w-full max-w-sm bg-card rounded-2xl border border-border p-6 animate-fade-in">
-          <p className="text-sm text-foreground mb-4">{initError}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover-scale"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Block rendering until auth is initialized to prevent infinite loops
-  // Exception: allow /auth and /reset-password to render so users can still log in.
-  if (loading && !allowRenderWhileLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
         <div className="relative">
