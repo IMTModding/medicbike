@@ -113,6 +113,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log(`User created: ${newUser.user.id}`);
 
+    // Wait a moment for the trigger to create the profile
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Update the user's role if admin
     if (role === "admin") {
       const { error: updateRoleError } = await supabaseAdmin
@@ -125,30 +128,48 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // Update profile with organization linkage
+    // Update or create profile with organization linkage using upsert
+    const profileData: Record<string, unknown> = {
+      user_id: newUser.user.id,
+      full_name: fullName,
+    };
+
     if (role === "employee" && inviteCodeId) {
+      profileData.invite_code_id = inviteCodeId;
+      profileData.admin_id = userData.user.id;
+    } else if (role === "admin") {
+      profileData.admin_id = newUser.user.id;
+    }
+
+    // First try to update existing profile
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("user_id", newUser.user.id)
+      .single();
+
+    if (existingProfile) {
+      // Profile exists, update it
       const { error: updateProfileError } = await supabaseAdmin
         .from("profiles")
-        .update({
-          invite_code_id: inviteCodeId,
-          admin_id: userData.user.id,
-        })
+        .update(profileData)
         .eq("user_id", newUser.user.id);
 
       if (updateProfileError) {
         console.error("Error updating profile:", updateProfileError);
+      } else {
+        console.log("Profile updated with organization info");
       }
-    } else if (role === "admin") {
-      // For admin, set admin_id to themselves
-      const { error: updateProfileError } = await supabaseAdmin
+    } else {
+      // Profile doesn't exist, create it
+      const { error: insertProfileError } = await supabaseAdmin
         .from("profiles")
-        .update({
-          admin_id: newUser.user.id,
-        })
-        .eq("user_id", newUser.user.id);
+        .insert(profileData);
 
-      if (updateProfileError) {
-        console.error("Error updating admin profile:", updateProfileError);
+      if (insertProfileError) {
+        console.error("Error inserting profile:", insertProfileError);
+      } else {
+        console.log("Profile created with organization info");
       }
     }
 
