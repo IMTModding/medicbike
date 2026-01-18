@@ -93,7 +93,9 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
             upsert: false,
           });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          throw new Error(`Upload image: ${uploadError.message}`);
+        }
 
         const { data: urlData } = supabase.storage
           .from('news')
@@ -114,7 +116,9 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
         .select('id')
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        throw new Error(`Insert news: ${insertError.message}`);
+      }
 
       // Send push notification to organization members
       if (newsData?.id) {
@@ -130,10 +134,15 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
       onCreated?.();
     } catch (error: unknown) {
       console.error('Error creating news:', error);
+
+      // Best-effort extraction of useful info
+      const anyErr = error as any;
       const message =
-        typeof error === 'object' && error && 'message' in error
-          ? String((error as any).message)
-          : 'Erreur inconnue';
+        anyErr?.message ??
+        anyErr?.error_description ??
+        anyErr?.hint ??
+        (typeof anyErr === 'string' ? anyErr : JSON.stringify(anyErr));
+
       toast.error(`Erreur lors de la publication : ${message}`);
     } finally {
       setLoading(false);
