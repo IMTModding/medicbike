@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
 
   const fetchUserRole = async (userId: string) => {
@@ -45,14 +46,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    // If auth init hangs (offline, blocked third-party storage, etc.), don't keep users stuck.
+    const timeoutId = window.setTimeout(() => {
+      if (!isMounted) return;
+      setInitError('Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez.');
+      setLoading(false);
+    }, 8000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Defer Supabase calls with setTimeout
+          // Defer backend calls with setTimeout
           setTimeout(() => {
             fetchUserRole(session.user.id);
           }, 0);
@@ -62,18 +72,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      }
-      setLoading(false);
-    });
+    (async () => {
+      try {
+        // THEN check for existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
 
-    return () => subscription.unsubscribe();
+        window.clearTimeout(timeoutId);
+        setInitError(null);
+
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          fetchUserRole(session.user.id);
+        }
+      } catch (e) {
+        if (!isMounted) return;
+        setInitError('Erreur lors de l\'initialisation. Réessayez.');
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const validateInviteCode = async (code: string) => {
@@ -154,6 +181,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isAdmin = role === 'admin';
+
+  // If auth initialization failed (timeout/offline), show a clear retry screen
+  if (initError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 p-6">
+        <div className="flex flex-col items-center gap-3">
+          <img
+            src={logo}
+            alt="MEDICBIKE"
+            className="w-20 h-20 rounded-full object-cover shadow-lg"
+          />
+          <div className="text-center">
+            <h1 className="font-bold text-xl text-foreground">MEDICBIKE</h1>
+            <p className="text-sm text-muted-foreground">Unité Médicale Motocycliste</p>
+          </div>
+        </div>
+
+        <div className="w-full max-w-sm bg-card rounded-2xl border border-border p-6 animate-fade-in">
+          <p className="text-sm text-foreground mb-4">{initError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover-scale"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Block rendering until auth is initialized to prevent infinite loops
   if (loading) {
