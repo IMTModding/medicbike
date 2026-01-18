@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHistoryInterventions } from '@/hooks/useInterventions';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -13,7 +14,10 @@ import {
   Loader2,
   History,
   Search,
-  X
+  X,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +26,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ExportHistoryDialog from '@/components/ExportHistoryDialog';
 import { HistoryPageSkeleton } from '@/components/PageSkeleton';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { toast } from 'sonner';
 import {
   Select,
   SelectContent,
@@ -63,8 +69,12 @@ const HistoryPage = () => {
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   const [appliedStartDate, setAppliedStartDate] = useState('');
   const [appliedEndDate, setAppliedEndDate] = useState('');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   // React Query with caching
@@ -93,6 +103,54 @@ const HistoryPage = () => {
     setAppliedEndDate('');
     setSearchQuery('');
     setUrgencyFilter('all');
+  };
+
+  const toggleSelection = (id: string) => {
+    const newSelection = new Set(selectedIds);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedIds(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredInterventions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredInterventions.map(i => i.id)));
+    }
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('interventions')
+        .delete()
+        .in('id', Array.from(selectedIds));
+
+      if (error) throw error;
+
+      toast.success(`${selectedIds.size} intervention(s) supprimée(s)`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      refetch();
+    } catch (error) {
+      console.error('Error deleting interventions:', error);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
   };
 
   // Filtered interventions based on search and urgency
@@ -158,30 +216,77 @@ const HistoryPage = () => {
         <div className="container flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => navigate('/')}
+              onClick={() => selectionMode ? cancelSelectionMode() : navigate('/')}
               className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              {selectionMode ? <X className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
             </button>
             <div>
-              <h1 className="font-bold text-lg text-foreground">Historique</h1>
-              <p className="text-xs text-muted-foreground">Interventions terminées</p>
+              <h1 className="font-bold text-lg text-foreground">
+                {selectionMode ? `${selectedIds.size} sélectionnée(s)` : 'Historique'}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {selectionMode ? 'Sélectionnez les interventions à supprimer' : 'Interventions terminées'}
+              </p>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
-            <ExportHistoryDialog startDate={appliedStartDate} endDate={appliedEndDate} />
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(showFilters && "bg-primary text-primary-foreground")}
-            >
-              <Filter className="w-5 h-5" />
-            </Button>
+            {selectionMode ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                >
+                  {selectedIds.size === filteredInterventions.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={selectedIds.size === 0}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <ExportHistoryDialog startDate={appliedStartDate} endDate={appliedEndDate} />
+                {isAdmin && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => setSelectionMode(true)}
+                    title="Supprimer des interventions"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={cn(showFilters && "bg-primary text-primary-foreground")}
+                >
+                  <Filter className="w-5 h-5" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Supprimer les interventions"
+        description={`Êtes-vous sûr de vouloir supprimer ${selectedIds.size} intervention(s) ? Cette action est irréversible.`}
+        confirmLabel={deleting ? "Suppression..." : "Supprimer"}
+        onConfirm={handleDeleteSelected}
+        variant="destructive"
+      />
 
       <main className="container px-4 py-6">
         {/* Search Bar */}
@@ -310,8 +415,34 @@ const HistoryPage = () => {
             return (
               <div 
                 key={intervention.id}
-                className="bg-card rounded-xl border border-border p-4"
+                className={cn(
+                  "bg-card rounded-xl border border-border p-4 transition-colors",
+                  selectionMode && "cursor-pointer",
+                  selectionMode && selectedIds.has(intervention.id) && "border-primary bg-primary/5"
+                )}
+                onClick={() => selectionMode && toggleSelection(intervention.id)}
               >
+                {/* Selection checkbox */}
+                {selectionMode && (
+                  <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelection(intervention.id);
+                      }}
+                      className="text-primary"
+                    >
+                      {selectedIds.has(intervention.id) ? (
+                        <CheckSquare className="w-5 h-5" />
+                      ) : (
+                        <Square className="w-5 h-5" />
+                      )}
+                    </button>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedIds.has(intervention.id) ? 'Sélectionnée' : 'Cliquez pour sélectionner'}
+                    </span>
+                  </div>
+                )}
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <span className={cn(
