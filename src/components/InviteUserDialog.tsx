@@ -81,8 +81,6 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
     setTempPassword(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('invite-user', {
         body: {
           email: email.trim(),
@@ -92,12 +90,16 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
         },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
+      // Check for error in response data first (custom error messages from edge function)
       if (response.data?.error) {
         throw new Error(response.data.error);
+      }
+
+      // Then check for generic function invoke error
+      if (response.error) {
+        // Try to parse the error context for a more specific message
+        const errorMessage = response.error.message || 'Erreur lors de l\'invitation';
+        throw new Error(errorMessage);
       }
 
       // If tempPassword is returned (email not configured), show it
