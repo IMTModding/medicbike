@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -28,6 +28,7 @@ interface Employee {
   id: string;
   user_id: string;
   full_name: string | null;
+  avatar_url: string | null;
   created_at: string;
   invite_code_id: string | null;
   organization_name?: string;
@@ -186,6 +187,7 @@ const EmployeesPage = () => {
       id: profile.id,
       user_id: profile.user_id,
       full_name: profile.full_name,
+      avatar_url: profile.avatar_url,
       created_at: profile.created_at,
       invite_code_id: profile.invite_code_id,
       organization_name: profile.invite_code_id
@@ -369,6 +371,19 @@ const EmployeesPage = () => {
                 <Card key={employee.id} className="bg-card border-border">
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-warning flex items-center justify-center overflow-hidden mr-3 flex-shrink-0">
+                        {employee.avatar_url ? (
+                          <img 
+                            src={employee.avatar_url} 
+                            alt={employee.full_name || 'Avatar'} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User className="w-5 h-5 text-white" />
+                        )}
+                      </div>
+                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           {/* Online indicator */}
