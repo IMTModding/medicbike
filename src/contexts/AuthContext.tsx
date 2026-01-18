@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   role: UserRole | null;
   isAdmin: boolean;
-  signUp: (email: string, password: string, fullName: string, inviteCode: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, phone: string, inviteCode: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   validateInviteCode: (code: string) => Promise<{ valid: boolean; organizationName?: string; adminId?: string; codeId?: string }>;
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  const signUp = async (email: string, password: string, fullName: string, inviteCode: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phone: string, inviteCode: string) => {
     // Validate invite code first
     const codeValidation = await validateInviteCode(inviteCode);
     if (!codeValidation.valid) {
@@ -102,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          phone: phone,
         },
       },
     });
@@ -110,13 +111,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error };
     }
     
-    // Update profile with invite code and admin link
+    // Update profile with invite code, admin link and phone
     if (data.user) {
       await supabase
         .from('profiles')
         .update({
           invite_code_id: codeValidation.codeId,
           admin_id: codeValidation.adminId,
+          phone: phone,
         })
         .eq('user_id', data.user.id);
     }

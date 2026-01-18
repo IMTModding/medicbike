@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -29,6 +29,7 @@ interface Employee {
   user_id: string;
   full_name: string | null;
   avatar_url: string | null;
+  phone: string | null;
   created_at: string;
   invite_code_id: string | null;
   organization_name?: string;
@@ -188,6 +189,7 @@ const EmployeesPage = () => {
       user_id: profile.user_id,
       full_name: profile.full_name,
       avatar_url: profile.avatar_url,
+      phone: profile.phone,
       created_at: profile.created_at,
       invite_code_id: profile.invite_code_id,
       organization_name: profile.invite_code_id
@@ -418,39 +420,64 @@ const EmployeesPage = () => {
                         </div>
                       </div>
 
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-destructive"
-                            disabled={deletingId === employee.id}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Retirer cet employé ?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {employee.full_name || 'Cet employé'} sera retiré de votre
-                              organisation. Il pourra toujours accéder à son compte mais ne
-                              sera plus lié à vos interventions.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() =>
-                                handleRemoveEmployee(employee.id, employee.user_id)
-                              }
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      {/* Contact buttons */}
+                      <div className="flex items-center gap-1">
+                        {employee.phone && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                              onClick={() => window.open(`tel:${employee.phone}`, '_self')}
+                              title="Appeler"
                             >
-                              Retirer
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
+                              onClick={() => window.open(`sms:${employee.phone}`, '_self')}
+                              title="Envoyer un SMS"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              disabled={deletingId === employee.id}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Retirer cet employé ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {employee.full_name || 'Cet employé'} sera retiré de votre
+                                organisation. Il pourra toujours accéder à son compte mais ne
+                                sera plus lié à vos interventions.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  handleRemoveEmployee(employee.id, employee.user_id)
+                                }
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Retirer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

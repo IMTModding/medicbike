@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mail, Lock, User, AlertCircle, KeyRound, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, KeyRound, CheckCircle2, ArrowLeft, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,7 @@ import logo from '@/assets/logo.jpg';
 
 const emailSchema = z.string().email('Email invalide');
 const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères');
+const phoneSchema = z.string().min(10, 'Numéro de téléphone invalide').regex(/^[0-9+\s-]+$/, 'Format de téléphone invalide');
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,6 +19,7 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [codeValidated, setCodeValidated] = useState(false);
@@ -88,6 +90,9 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
+      if (!isLogin) {
+        phoneSchema.parse(phone);
+      }
     } catch (err) {
       if (err instanceof z.ZodError) {
         setError(err.errors[0].message);
@@ -122,7 +127,13 @@ const Auth = () => {
           return;
         }
         
-        const { error } = await signUp(email, password, fullName, inviteCode);
+        if (!phone.trim()) {
+          setError('Le numéro de téléphone est requis');
+          setLoading(false);
+          return;
+        }
+        
+        const { error } = await signUp(email, password, fullName, phone, inviteCode);
         if (error) {
           if (error.message.includes('already registered')) {
             setError('Cet email est déjà utilisé');
@@ -293,6 +304,17 @@ const Auth = () => {
                   placeholder="Nom complet"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  className="pl-10 h-12 bg-secondary border-border"
+                />
+              </div>
+              
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="tel"
+                  placeholder="Téléphone (ex: 06 12 34 56 78)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="pl-10 h-12 bg-secondary border-border"
                 />
               </div>
