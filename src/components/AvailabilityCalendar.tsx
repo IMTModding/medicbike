@@ -46,7 +46,7 @@ export const AvailabilityCalendar = () => {
   const [saving, setSaving] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'list'>('week');
 
   const loadAvailabilities = async () => {
     if (!user) return;
@@ -296,10 +296,11 @@ export const AvailabilityCalendar = () => {
         </Button>
       </div>
 
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month' | 'list')} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger value="week">2 semaines</TabsTrigger>
           <TabsTrigger value="month">Mois</TabsTrigger>
+          <TabsTrigger value="list">Liste</TabsTrigger>
         </TabsList>
 
         <TabsContent value="week" className="mt-0">
@@ -311,6 +312,22 @@ export const AvailabilityCalendar = () => {
               </div>
             ))}
             {next14Days.map((day) => renderDayCell(day))}
+          </div>
+          
+          {/* Legend */}
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-2 border-t border-border">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-success/20 border border-success/30" />
+              <span>Vous seul</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-primary/15 border border-primary/30" />
+              <span>Collègues</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-gradient-to-br from-success/30 to-primary/30 border border-primary/30" />
+              <span>Vous + collègues</span>
+            </div>
           </div>
         </TabsContent>
 
@@ -349,94 +366,96 @@ export const AvailabilityCalendar = () => {
             ))}
             {monthDays.map((day) => renderDayCell(day, true))}
           </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mb-4 pt-2 border-t border-border">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-success/20 border border-success/30" />
-          <span>Vous seul</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-primary/15 border border-primary/30" />
-          <span>Collègues</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-gradient-to-br from-success/30 to-primary/30 border border-primary/30" />
-          <span>Vous + collègues</span>
-        </div>
-      </div>
-
-      {/* Upcoming availabilities by person */}
-      <div className="space-y-3 max-h-64 overflow-y-auto">
-        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-          <Users className="w-3 h-3" />
-          Prochaines disponibilités par personne :
-        </p>
-        
-        {Object.entries(upcomingByUser()).map(([userId, availabilities]) => {
-          const isMe = userId === user?.id;
-          const name = isMe ? 'Vous' : (profileNames[userId] || 'Chargement...');
-          const sortedAvails = availabilities.sort((a, b) => a.date.localeCompare(b.date));
           
-          return (
-            <div 
-              key={userId}
-              className={cn(
-                "rounded-lg p-3 border",
-                isMe ? "bg-success/5 border-success/20" : "bg-secondary/30 border-border"
-              )}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
-                  isMe ? "bg-success/20 text-success" : "bg-primary/20 text-primary"
-                )}>
-                  <User className="w-3 h-3" />
-                </div>
-                <span className="font-medium text-sm text-foreground">{name}</span>
-                <span className="text-xs text-muted-foreground">
-                  ({sortedAvails.length} jour{sortedAvails.length > 1 ? 's' : ''})
-                </span>
-              </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-2 border-t border-border">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-success/20 border border-success/30" />
+              <span>Vous seul</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-primary/15 border border-primary/30" />
+              <span>Collègues</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-gradient-to-br from-success/30 to-primary/30 border border-primary/30" />
+              <span>Vous + collègues</span>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-0">
+          {/* Upcoming availabilities by person */}
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            <p className="text-xs text-muted-foreground font-medium flex items-center gap-1 sticky top-0 bg-card pb-2">
+              <Users className="w-3 h-3" />
+              Prochaines disponibilités par personne :
+            </p>
+            
+            {Object.entries(upcomingByUser()).map(([userId, availabilities]) => {
+              const isMe = userId === user?.id;
+              const name = isMe ? 'Vous' : (profileNames[userId] || 'Chargement...');
+              const sortedAvails = availabilities.sort((a, b) => a.date.localeCompare(b.date));
               
-              <div className="flex flex-wrap gap-1.5">
-                {sortedAvails.slice(0, 7).map((avail) => (
-                  <div 
-                    key={avail.id}
-                    className={cn(
-                      "text-[10px] px-2 py-1 rounded-full flex items-center gap-1",
-                      isMe ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
-                    )}
-                  >
-                    <span>{format(parseISO(avail.date), 'd MMM', { locale: fr })}</span>
-                    {isMe && (
-                      <button 
-                        onClick={() => handleDeleteAvailability(avail.id)}
-                        className="hover:text-destructive ml-0.5"
+              return (
+                <div 
+                  key={userId}
+                  className={cn(
+                    "rounded-lg p-3 border",
+                    isMe ? "bg-success/5 border-success/20" : "bg-secondary/30 border-border"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
+                      isMe ? "bg-success/20 text-success" : "bg-primary/20 text-primary"
+                    )}>
+                      <User className="w-3 h-3" />
+                    </div>
+                    <span className="font-medium text-sm text-foreground">{name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({sortedAvails.length} jour{sortedAvails.length > 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1.5">
+                    {sortedAvails.slice(0, 10).map((avail) => (
+                      <div 
+                        key={avail.id}
+                        className={cn(
+                          "text-[10px] px-2 py-1 rounded-full flex items-center gap-1",
+                          isMe ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
+                        )}
                       >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
+                        <span>{format(parseISO(avail.date), 'd MMM', { locale: fr })}</span>
+                        {isMe && (
+                          <button 
+                            onClick={() => handleDeleteAvailability(avail.id)}
+                            className="hover:text-destructive ml-0.5"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {sortedAvails.length > 10 && (
+                      <span className="text-[10px] px-2 py-1 text-muted-foreground">
+                        +{sortedAvails.length - 10}
+                      </span>
                     )}
                   </div>
-                ))}
-                {sortedAvails.length > 7 && (
-                  <span className="text-[10px] px-2 py-1 text-muted-foreground">
-                    +{sortedAvails.length - 7}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
 
-        {Object.keys(upcomingByUser()).length === 0 && !loading && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Aucune disponibilité enregistrée
-          </p>
-        )}
-      </div>
+            {Object.keys(upcomingByUser()).length === 0 && !loading && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aucune disponibilité enregistrée
+              </p>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Availability Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
