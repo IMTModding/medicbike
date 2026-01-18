@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogOut, LayoutDashboard, History, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper, Settings } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -131,6 +131,10 @@ export const Header = () => {
                 </>
               )}
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
+                <Settings className="w-4 h-4 mr-2" />
+                Paramètres
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
                 Déconnexion

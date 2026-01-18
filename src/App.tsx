@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import HistoryPage from "./pages/HistoryPage";
-
 import StatsPage from "./pages/StatsPage";
 import AvailabilityPage from "./pages/AvailabilityPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -18,6 +17,7 @@ import EmployeesPage from "./pages/EmployeesPage";
 import GeneralChatPage from "./pages/GeneralChatPage";
 import ResetPassword from "./pages/ResetPassword";
 import NewsPage from "./pages/NewsPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +44,7 @@ const App = () => (
             <Route path="/general-chat" element={<GeneralChatPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/news" element={<NewsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

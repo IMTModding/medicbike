@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface AlertCardProps {
   intervention: Intervention;
@@ -50,10 +52,18 @@ const getTimeAgo = (dateString: string) => {
 
 export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCardProps) => {
   const { isAdmin } = useAuth();
+  const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
   const timeAgo = getTimeAgo(intervention.created_at);
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
+
+  const handleComplete = () => {
+    if (onComplete) {
+      onComplete(intervention.id);
+    }
+    setShowConfirmComplete(false);
+  };
 
   const openGoogleMaps = () => {
     if (intervention.location) {
@@ -161,7 +171,7 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
               variant="success"
               size="lg"
               className="w-full"
-              onClick={() => onComplete(intervention.id)}
+              onClick={() => setShowConfirmComplete(true)}
             >
               <Check className="w-4 h-4 mr-2" />
               Terminer l'intervention
@@ -195,7 +205,7 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
               variant="success"
               size="lg"
               className="w-full"
-              onClick={() => onComplete(intervention.id)}
+              onClick={() => setShowConfirmComplete(true)}
             >
               <Check className="w-4 h-4 mr-2" />
               Terminer l'intervention
@@ -203,6 +213,16 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={showConfirmComplete}
+        onOpenChange={setShowConfirmComplete}
+        title="Terminer l'intervention ?"
+        description={`Êtes-vous sûr de vouloir marquer "${intervention.title}" comme terminée ? Cette action est irréversible.`}
+        confirmLabel="Terminer"
+        cancelLabel="Annuler"
+        onConfirm={handleComplete}
+      />
     </div>
   );
 };
