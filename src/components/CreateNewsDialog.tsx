@@ -53,6 +53,25 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
     }
   };
 
+  const sendPushNotification = async (newsId: string, newsTitle: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      await supabase.functions.invoke('send-push-notification', {
+        body: {
+          title: '📰 Nouvelle actualité',
+          body: newsTitle,
+          type: 'news',
+          newsId,
+        },
+      });
+      console.log('News push notification sent');
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !title.trim()) return;
@@ -81,16 +100,23 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
       }
 
       // Create news entry
-      const { error: insertError } = await supabase
+      const { data: newsData, error: insertError } = await supabase
         .from('news')
         .insert({
           title: title.trim(),
           content: content.trim() || null,
           image_url: imageUrl,
           admin_id: user.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) throw insertError;
+
+      // Send push notification to organization members
+      if (newsData?.id) {
+        await sendPushNotification(newsData.id, title.trim());
+      }
 
       toast.success('Actualité publiée');
       setOpen(false);
