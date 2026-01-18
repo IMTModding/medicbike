@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogOut, LayoutDashboard, History, MapPin, BarChart3, User, KeyRound, Users, MessageCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, MapPin, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -58,6 +58,14 @@ export const Header = () => {
           <NotificationToggle />
           
           {/* Quick access buttons */}
+          <button 
+            onClick={() => navigate('/news')}
+            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            title="Actualités"
+          >
+            <Newspaper className="w-5 h-5 text-foreground" />
+          </button>
+          
           <button 
             onClick={() => navigate('/general-chat')}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
