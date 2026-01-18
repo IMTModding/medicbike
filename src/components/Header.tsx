@@ -55,13 +55,12 @@ export const Header = () => {
           </div>
         </div>
         
-        {/* Navigation buttons - scrollable on small screens */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <NotificationToggle />
           
           <button 
             onClick={() => navigate('/news')}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
+            className="hidden sm:flex w-9 h-9 rounded-full bg-secondary items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Actualités"
           >
             <Newspaper className="w-4 h-4 text-foreground" />
@@ -69,7 +68,7 @@ export const Header = () => {
           
           <button 
             onClick={() => navigate('/general-chat')}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Chat général"
           >
             <MessageCircle className="w-4 h-4 text-foreground" />
@@ -77,7 +76,7 @@ export const Header = () => {
           
           <button 
             onClick={() => navigate('/map')}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Carte"
           >
             <MapPin className="w-4 h-4 text-foreground" />
@@ -85,17 +84,16 @@ export const Header = () => {
           
           <button 
             onClick={() => navigate('/stats')}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
+            className="hidden sm:flex w-9 h-9 rounded-full bg-secondary items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Statistiques"
           >
             <BarChart3 className="w-4 h-4 text-foreground" />
           </button>
 
-          {/* Menu dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button 
-                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent overflow-hidden shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent overflow-hidden shrink-0"
                 title="Menu"
               >
                 {avatarUrl ? (
@@ -113,6 +111,14 @@ export const Header = () => {
               <DropdownMenuItem onClick={() => navigate('/history')}>
                 <History className="w-4 h-4 mr-2" />
                 Historique
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/news')} className="sm:hidden">
+                <Newspaper className="w-4 h-4 mr-2" />
+                Actualités
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/stats')} className="sm:hidden">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Statistiques
               </DropdownMenuItem>
               {isAdmin && (
                 <>
