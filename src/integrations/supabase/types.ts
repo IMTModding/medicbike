@@ -480,6 +480,7 @@ export type Database = {
           invite_code_id: string
           onboarding_completed: boolean
           phone: string
+          role: string
           user_id: string
         }[]
       }

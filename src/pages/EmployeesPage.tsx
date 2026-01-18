@@ -37,6 +37,7 @@ interface Employee {
   invite_code_id: string | null;
   organization_name?: string;
   email?: string;
+  role?: string;
 }
 
 interface PresenceState {
@@ -196,6 +197,7 @@ const EmployeesPage = () => {
       organization_name: profile.invite_code_id
         ? codeMap.get(profile.invite_code_id)
         : undefined,
+      role: profile.role,
     }));
 
     setEmployees(employeesData);
@@ -380,13 +382,22 @@ const EmployeesPage = () => {
           ) : (
             filteredEmployees.map((employee) => {
               const status = getEmployeeStatus(employee.user_id);
+              const isEmployeeAdmin = employee.role === 'admin';
               
               return (
-                <Card key={employee.id} className="bg-card border-border">
+                <Card key={employee.id} className={cn(
+                  "bg-card border-border",
+                  isEmployeeAdmin && "border-purple-500/50 bg-purple-500/5"
+                )}>
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">
                       {/* Avatar */}
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-warning flex items-center justify-center overflow-hidden mr-3 flex-shrink-0">
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center overflow-hidden mr-3 flex-shrink-0",
+                        isEmployeeAdmin 
+                          ? "bg-gradient-to-br from-purple-500 to-purple-700" 
+                          : "bg-gradient-to-br from-primary to-warning"
+                      )}>
                         {employee.avatar_url ? (
                           <img 
                             src={employee.avatar_url} 
@@ -405,9 +416,17 @@ const EmployeesPage = () => {
                             "w-2.5 h-2.5 rounded-full",
                             status.color
                           )} />
-                          <h3 className="font-semibold text-foreground truncate">
+                          <h3 className={cn(
+                            "font-semibold truncate",
+                            isEmployeeAdmin ? "text-purple-600 dark:text-purple-400" : "text-foreground"
+                          )}>
                             {employee.full_name || 'Sans nom'}
                           </h3>
+                          {isEmployeeAdmin && (
+                            <Badge className="bg-purple-500 text-white text-xs">
+                              Admin
+                            </Badge>
+                          )}
                           <Badge 
                             variant="outline" 
                             className={cn("text-xs", status.textColor)}
