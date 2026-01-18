@@ -313,6 +313,7 @@ export type Database = {
           admin_id: string | null
           avatar_url: string | null
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           invite_code_id: string | null
@@ -324,6 +325,7 @@ export type Database = {
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
@@ -335,6 +337,7 @@ export type Database = {
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           invite_code_id?: string | null

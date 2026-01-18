@@ -39,6 +39,11 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        admin: {
+          DEFAULT: "hsl(var(--admin))",
+          strong: "hsl(var(--admin-strong))",
+          foreground: "hsl(var(--admin-foreground))",
+        },
         urgent: {
           DEFAULT: "hsl(var(--urgent))",
           foreground: "hsl(var(--urgent-foreground))",

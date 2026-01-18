@@ -385,23 +385,28 @@ const EmployeesPage = () => {
               const isEmployeeAdmin = employee.role === 'admin';
               
               return (
-                <Card key={employee.id} className={cn(
-                  "bg-card border-border",
-                  isEmployeeAdmin && "border-purple-500/50 bg-purple-500/5"
-                )}>
+                <Card
+                  key={employee.id}
+                  className={cn(
+                    "bg-card border-border",
+                    isEmployeeAdmin && "border-admin/50 bg-admin/5"
+                  )}
+                >
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">
                       {/* Avatar */}
-                      <div className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center overflow-hidden mr-3 flex-shrink-0",
-                        isEmployeeAdmin 
-                          ? "bg-gradient-to-br from-purple-500 to-purple-700" 
-                          : "bg-gradient-to-br from-primary to-warning"
-                      )}>
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center overflow-hidden mr-3 flex-shrink-0",
+                          isEmployeeAdmin
+                            ? "bg-gradient-to-br from-admin to-admin-strong"
+                            : "bg-gradient-to-br from-primary to-warning"
+                        )}
+                      >
                         {employee.avatar_url ? (
-                          <img 
-                            src={employee.avatar_url} 
-                            alt={employee.full_name || 'Avatar'} 
+                          <img
+                            src={employee.avatar_url}
+                            alt={employee.full_name || 'Avatar'}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -412,23 +417,27 @@ const EmployeesPage = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           {/* Online indicator */}
-                          <div className={cn(
-                            "w-2.5 h-2.5 rounded-full",
-                            status.color
-                          )} />
-                          <h3 className={cn(
-                            "font-semibold truncate",
-                            isEmployeeAdmin ? "text-purple-600 dark:text-purple-400" : "text-foreground"
-                          )}>
+                          <div
+                            className={cn(
+                              "w-2.5 h-2.5 rounded-full",
+                              status.color
+                            )}
+                          />
+                          <h3
+                            className={cn(
+                              "font-semibold truncate",
+                              isEmployeeAdmin ? "text-admin" : "text-foreground"
+                            )}
+                          >
                             {employee.full_name || 'Sans nom'}
                           </h3>
                           {isEmployeeAdmin && (
-                            <Badge className="bg-purple-500 text-white text-xs">
+                            <Badge className="bg-admin text-admin-foreground text-xs">
                               Admin
                             </Badge>
                           )}
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={cn("text-xs", status.textColor)}
                           >
                             {status.label}
