@@ -152,16 +152,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error };
     }
     
-    // Update profile with invite code, admin link and phone
+    // Update profile with invite code + admin link
     if (data.user) {
       await supabase
         .from('profiles')
         .update({
           invite_code_id: codeValidation.codeId,
           admin_id: codeValidation.adminId,
-          phone: phone,
         })
         .eq('user_id', data.user.id);
+
+      // Store contact info separately (protected)
+      await supabase
+        .from('profile_contacts')
+        .upsert({ user_id: data.user.id, email, phone }, { onConflict: 'user_id' });
     }
     
     return { error: null };

@@ -308,41 +308,59 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_id: string | null
           avatar_url: string | null
           created_at: string
-          email: string | null
           full_name: string | null
           id: string
           invite_code_id: string | null
           onboarding_completed: boolean | null
-          phone: string | null
           user_id: string
         }
         Insert: {
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
           onboarding_completed?: boolean | null
-          phone?: string | null
           user_id: string
         }
         Update: {
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
           onboarding_completed?: boolean | null
-          phone?: string | null
           user_id?: string
         }
         Relationships: [
