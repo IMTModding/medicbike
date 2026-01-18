@@ -131,7 +131,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .from("profiles")
         .update({ 
           invite_code_id: inviteCodeId,
-          admin_id: userData.user.id 
+          admin_id: userData.user.id,
+          email: email
         })
         .eq("user_id", newUser.user.id);
 
@@ -142,11 +143,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // For admin, set admin_id to themselves
       const { error: updateProfileError } = await supabaseAdmin
         .from("profiles")
-        .update({ admin_id: newUser.user.id })
+        .update({ 
+          admin_id: newUser.user.id,
+          email: email
+        })
         .eq("user_id", newUser.user.id);
 
       if (updateProfileError) {
         console.error("Error updating admin profile:", updateProfileError);
+      }
+    } else {
+      // Just update email for any other case
+      const { error: updateProfileError } = await supabaseAdmin
+        .from("profiles")
+        .update({ email: email })
+        .eq("user_id", newUser.user.id);
+
+      if (updateProfileError) {
+        console.error("Error updating profile email:", updateProfileError);
       }
     }
 

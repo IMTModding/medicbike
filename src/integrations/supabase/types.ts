@@ -474,6 +474,7 @@ export type Database = {
           admin_id: string
           avatar_url: string
           created_at: string
+          email: string
           full_name: string
           id: string
           invite_code_id: string

@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus, KeyRound } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus, KeyRound, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -189,7 +189,8 @@ const EmployeesPage = () => {
       user_id: profile.user_id,
       full_name: profile.full_name,
       avatar_url: profile.avatar_url,
-      phone: profile.phone, // Now properly filtered by the secure function
+      phone: profile.phone,
+      email: profile.email,
       created_at: profile.created_at,
       invite_code_id: profile.invite_code_id,
       organization_name: profile.invite_code_id
@@ -415,6 +416,19 @@ const EmployeesPage = () => {
                           </Badge>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                          {employee.email && (
+                            <button
+                              className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(employee.email!);
+                                toast.success('Email copié !');
+                              }}
+                              title="Cliquez pour copier l'email"
+                            >
+                              <Mail className="w-3 h-3" />
+                              <span className="truncate max-w-[180px]">{employee.email}</span>
+                            </button>
+                          )}
                           {employee.organization_name && (
                             <span className="flex items-center gap-1">
                               <Building2 className="w-3 h-3" />
