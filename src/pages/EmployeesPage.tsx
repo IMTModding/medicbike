@@ -18,11 +18,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import InviteUserDialog from '@/components/InviteUserDialog';
 
 interface Employee {
   id: string;
@@ -284,14 +285,17 @@ const EmployeesPage = () => {
       <Header />
 
       <main className="container mx-auto px-4 pt-20">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" />
-            Mes employés
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {employees.length} employé{employees.length > 1 ? 's' : ''} dans votre organisation
-          </p>
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+              <Users className="w-6 h-6 text-primary" />
+              Mes employés
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              {employees.length} employé{employees.length > 1 ? 's' : ''} dans votre organisation
+            </p>
+          </div>
+          <InviteUserDialog onUserInvited={fetchEmployees} />
         </div>
 
         {/* Stats cards */}
