@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { recordLogin } from '@/hooks/useLoginHistory';
+import logo from '@/assets/logo.jpg';
 
 type UserRole = 'admin' | 'employee';
 
@@ -157,8 +158,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Block rendering until auth is initialized to prevent infinite loops
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
+        <div className="relative">
+          <img 
+            src={logo} 
+            alt="MEDICBIKE" 
+            className="w-24 h-24 rounded-full object-cover shadow-lg animate-pulse"
+          />
+          <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="font-bold text-xl text-foreground">MEDICBIKE</h1>
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+        <div className="flex gap-1">
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
       </div>
     );
   }
