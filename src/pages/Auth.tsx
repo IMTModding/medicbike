@@ -154,12 +154,26 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-3 mb-8">
-        <img src={logo} alt="MEDICBIKE Logo" className="w-24 h-24 rounded-full object-cover shadow-lg" />
-        <div className="text-center">
-          <h1 className="font-bold text-2xl text-foreground">MEDICBIKE</h1>
-          <p className="text-sm text-muted-foreground">Unité Médicale Motocycliste</p>
+      {/* Logo & Description */}
+      <div className="flex flex-col items-center gap-4 mb-8 max-w-sm text-center">
+        <img src={logo} alt="MEDICBIKE Logo" className="w-28 h-28 rounded-full object-cover shadow-lg" />
+        
+        <div className="space-y-2">
+          <h1 className="font-bold text-3xl text-foreground tracking-tight">MEDICBIKE</h1>
+          <p className="text-sm font-medium text-primary">Unité Médicale Motocycliste</p>
+        </div>
+        
+        <div className="space-y-3 px-2">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Application de gestion et de coordination pour les équipes de secouristes motocyclistes. 
+            Recevez les alertes d'intervention en temps réel, coordonnez vos disponibilités et 
+            restez connecté avec votre équipe.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 text-xs">
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded-full">Alertes temps réel</span>
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded-full">Géolocalisation</span>
+            <span className="bg-primary/10 text-primary px-2 py-1 rounded-full">Coordination équipe</span>
+          </div>
         </div>
       </div>
 
