@@ -4,6 +4,7 @@ import { ArrowLeft, Newspaper, Loader2 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { NewsCard } from '@/components/NewsCard';
 import { CreateNewsDialog } from '@/components/CreateNewsDialog';
+import { EditNewsDialog } from '@/components/EditNewsDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -21,6 +22,7 @@ const NewsPage = () => {
   const [news, setNews] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingNews, setEditingNews] = useState<News | null>(null);
   
   const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
@@ -107,6 +109,12 @@ const NewsPage = () => {
       setDeletingId(null);
     }
   };
+  const handleEdit = (id: string) => {
+    const newsItem = news.find(n => n.id === id);
+    if (newsItem) {
+      setEditingNews(newsItem);
+    }
+  };
 
   if (authLoading || loading) {
     return (
@@ -153,6 +161,7 @@ const NewsPage = () => {
               createdAt={item.created_at}
               isAdmin={role === 'admin'}
               onDelete={handleDelete}
+              onEdit={handleEdit}
               deleting={deletingId === item.id}
             />
           ))}
@@ -176,6 +185,16 @@ const NewsPage = () => {
 
       {/* Admin: Create News Button */}
       {role === 'admin' && <CreateNewsDialog onCreated={loadNews} />}
+
+      {/* Edit Dialog */}
+      {editingNews && (
+        <EditNewsDialog
+          news={editingNews}
+          open={!!editingNews}
+          onOpenChange={(open) => !open && setEditingNews(null)}
+          onUpdated={loadNews}
+        />
+      )}
     </div>
   );
 };
