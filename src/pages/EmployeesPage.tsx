@@ -200,22 +200,27 @@ const EmployeesPage = () => {
     setLoadingEmployees(false);
   };
 
-  const handleRemoveEmployee = async (employeeId: string, userId: string) => {
+  const handleDeleteEmployee = async (employeeId: string, userId: string) => {
     setDeletingId(employeeId);
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ invite_code_id: null, admin_id: null })
-        .eq('id', employeeId);
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      });
 
-      if (error) throw error;
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
-      toast.success('Employé retiré de l\'organisation');
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      toast.success('Employé supprimé définitivement');
       fetchEmployees();
-    } catch (error) {
-      console.error('Error removing employee:', error);
-      toast.error('Erreur lors de la suppression');
+    } catch (error: any) {
+      console.error('Error deleting employee:', error);
+      toast.error(error.message || 'Erreur lors de la suppression');
     } finally {
       setDeletingId(null);
     }
@@ -461,22 +466,21 @@ const EmployeesPage = () => {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Retirer cet employé ?</AlertDialogTitle>
+                              <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                {employee.full_name || 'Cet employé'} sera retiré de votre
-                                organisation. Il pourra toujours accéder à son compte mais ne
-                                sera plus lié à vos interventions.
+                                <strong>{employee.full_name || 'Cet employé'}</strong> sera supprimé définitivement. 
+                                Son compte et toutes ses données seront effacés. Cette action est irréversible.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Annuler</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() =>
-                                  handleRemoveEmployee(employee.id, employee.user_id)
+                                  handleDeleteEmployee(employee.id, employee.user_id)
                                 }
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                Retirer
+                                Supprimer définitivement
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
