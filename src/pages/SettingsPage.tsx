@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
-import { ArrowLeft, Moon, Sun, Bell, User, Shield, LogOut, History, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Moon, Sun, Bell, User, Shield, LogOut, History, RefreshCw, Smartphone, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
 import LoginHistoryDialog from '@/components/LoginHistoryDialog';
+import TwoFactorSetup from '@/components/TwoFactorSetup';
+import { useTwoFactor } from '@/hooks/useTwoFactor';
+import { toast } from 'sonner';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -14,6 +17,8 @@ const SettingsPage = () => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showLoginHistory, setShowLoginHistory] = useState(false);
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const { isEnabled: is2FAEnabled, loading: loading2FA, disable2FA, refresh: refresh2FA } = useTwoFactor();
 
   useEffect(() => {
     setMounted(true);
@@ -30,8 +35,16 @@ const SettingsPage = () => {
     navigate('/auth');
   };
 
+  const handleDisable2FA = async () => {
+    const result = await disable2FA();
+    if (result.success) {
+      toast.success('2FA désactivé');
+    } else {
+      toast.error('Erreur lors de la désactivation');
+    }
+  };
+
   const handleResetOnboarding = () => {
-    // This would reset onboarding to show again
     localStorage.removeItem('onboarding_completed');
     window.location.reload();
   };
@@ -144,6 +157,42 @@ const SettingsPage = () => {
               <History className="w-4 h-4 mr-2" />
               Historique des connexions
             </Button>
+
+            {/* 2FA Section */}
+            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${is2FAEnabled ? 'bg-green-500/20 text-green-500' : 'bg-muted'}`}>
+                  {is2FAEnabled ? <ShieldCheck className="w-5 h-5" /> : <Smartphone className="w-5 h-5" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Authentification 2FA</p>
+                  <p className="text-xs text-muted-foreground">
+                    {is2FAEnabled ? 'Activée - Protection renforcée' : 'Désactivée'}
+                  </p>
+                </div>
+              </div>
+              {loading2FA ? (
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+              ) : is2FAEnabled ? (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleDisable2FA}
+                  className="text-destructive border-destructive/50"
+                >
+                  <ShieldOff className="w-4 h-4 mr-1" />
+                  Désactiver
+                </Button>
+              ) : (
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => setShow2FASetup(true)}
+                >
+                  Configurer
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -188,6 +237,13 @@ const SettingsPage = () => {
       <LoginHistoryDialog 
         open={showLoginHistory} 
         onOpenChange={setShowLoginHistory} 
+      />
+
+      {/* 2FA Setup Dialog */}
+      <TwoFactorSetup 
+        open={show2FASetup} 
+        onOpenChange={setShow2FASetup}
+        onSuccess={refresh2FA}
       />
     </div>
   );
