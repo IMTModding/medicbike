@@ -2,14 +2,29 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
+const CACHE_VERSION = 'v2-' + Date.now();
+const CACHE_NAME = 'medicbike-cache-' + CACHE_VERSION;
+
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
+  console.log('Service Worker installing...', CACHE_VERSION);
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activated');
-  event.waitUntil(self.clients.claim());
+  console.log('Service Worker activated', CACHE_VERSION);
+  // Delete old caches
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name.startsWith('medicbike-cache-') && name !== CACHE_NAME)
+          .map((name) => {
+            console.log('Deleting old cache:', name);
+            return caches.delete(name);
+          })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('push', (event) => {
