@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, BarChart3, TrendingUp, Users, Clock } from 'lucide-react';
+import { ArrowLeft, Loader2, BarChart3, TrendingUp, Users, Clock, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { exportStatsPDF } from '@/utils/pdfExport';
 import { 
   BarChart, 
   Bar, 
@@ -39,9 +41,21 @@ const COLORS = {
   low: '#22c55e'
 };
 
+interface Intervention {
+  id: string;
+  title: string;
+  location: string;
+  urgency: string;
+  status: string;
+  created_at: string;
+  completed_at?: string | null;
+}
+
 const StatsPage = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [interventionsData, setInterventionsData] = useState<Intervention[]>([]);
+  const [exporting, setExporting] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -70,6 +84,8 @@ const StatsPage = () => {
 
         const allInterventions = interventions || [];
         const allResponses = responses || [];
+        
+        setInterventionsData(allInterventions);
 
         // Calculate stats
         const totalInterventions = allInterventions.length;
@@ -143,9 +159,23 @@ const StatsPage = () => {
     return null;
   }
 
+  const handleExportPDF = async () => {
+    if (!stats) return;
+    
+    setExporting(true);
+    try {
+      exportStatsPDF(stats, interventionsData);
+      toast.success('Rapport PDF téléchargé');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Erreur lors de l\'export');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="container flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-4">
@@ -160,6 +190,19 @@ const StatsPage = () => {
               <p className="text-xs text-muted-foreground">Tableau de bord</p>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+            disabled={exporting || !stats}
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            Export PDF
+          </Button>
         </div>
       </header>
 

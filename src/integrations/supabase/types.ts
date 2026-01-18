@@ -340,6 +340,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_locations: {
+        Row: {
+          accuracy: number | null
+          id: string
+          is_active: boolean
+          latitude: number
+          longitude: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          id?: string
+          is_active?: boolean
+          latitude: number
+          longitude: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          id?: string
+          is_active?: boolean
+          latitude?: number
+          longitude?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
