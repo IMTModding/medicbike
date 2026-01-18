@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format, addDays, isSameDay, startOfDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Calendar, Plus, Trash2, X } from 'lucide-react';
+import { Calendar, Plus, Trash2, X, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +23,12 @@ interface Availability {
   end_time: string;
 }
 
+interface AvailabilityWithProfile extends Availability {
+  profiles?: {
+    full_name: string | null;
+  };
+}
+
 interface DateRange {
   from: Date | undefined;
   to?: Date | undefined;
@@ -30,9 +36,12 @@ interface DateRange {
 
 export const AvailabilityCalendar = () => {
   const { user } = useAuth();
-  const [availabilities, setAvailabilities] = useState<Availability[]>([]);
+  const [myAvailabilities, setMyAvailabilities] = useState<Availability[]>([]);
+  const [allAvailabilities, setAllAvailabilities] = useState<AvailabilityWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
 
@@ -40,21 +49,57 @@ export const AvailabilityCalendar = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      // Load my availabilities
+      const { data: myData, error: myError } = await supabase
         .from('availabilities')
         .select('*')
         .eq('user_id', user.id)
         .gte('date', format(new Date(), 'yyyy-MM-dd'))
         .order('date', { ascending: true });
 
-      if (error) throw error;
-      setAvailabilities(data || []);
+      if (myError) throw myError;
+      setMyAvailabilities(myData || []);
+
+      // Load all organization availabilities
+      const { data: allData, error: allError } = await supabase
+        .from('availabilities')
+        .select('*')
+        .gte('date', format(new Date(), 'yyyy-MM-dd'))
+        .order('date', { ascending: true });
+
+      if (allError) throw allError;
+      setAllAvailabilities(allData || []);
     } catch (error) {
       console.error('Error loading availabilities:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Load profile names separately since there's no foreign key
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    const loadProfiles = async () => {
+      const userIds = [...new Set(allAvailabilities.map(a => a.user_id))];
+      if (userIds.length === 0) return;
+      
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+      
+      if (data) {
+        const names: Record<string, string> = {};
+        data.forEach(p => {
+          names[p.user_id] = p.full_name || 'Anonyme';
+        });
+        setProfileNames(names);
+      }
+    };
+    
+    loadProfiles();
+  }, [allAvailabilities]);
 
   useEffect(() => {
     loadAvailabilities();
@@ -161,23 +206,30 @@ export const AvailabilityCalendar = () => {
   // Generate next 14 days for quick view
   const next14Days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
 
-  const hasAvailabilityOn = (day: Date) => {
-    return availabilities.some(a => a.date === format(day, 'yyyy-MM-dd'));
+  const hasMyAvailabilityOn = (day: Date) => {
+    return myAvailabilities.some(a => a.date === format(day, 'yyyy-MM-dd'));
   };
 
-  const getAvailabilityForDate = (day: Date) => {
-    return availabilities.find(a => a.date === format(day, 'yyyy-MM-dd'));
+  const getAvailabilitiesForDate = (day: Date) => {
+    return allAvailabilities.filter(a => a.date === format(day, 'yyyy-MM-dd'));
   };
 
-  // Get dates with availabilities for calendar highlighting
-  const availableDates = availabilities.map(a => new Date(a.date));
+  const getOthersCountForDate = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    return allAvailabilities.filter(a => a.date === dateStr && a.user_id !== user?.id).length;
+  };
+
+  const openDateDetail = (day: Date) => {
+    setSelectedDate(day);
+    setDetailDialogOpen(true);
+  };
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-medium text-foreground flex items-center gap-2">
           <Calendar className="w-4 h-4 text-primary" />
-          Mes disponibilités
+          Disponibilités équipe
         </h3>
         <Button 
           size="sm" 
@@ -198,40 +250,56 @@ export const AvailabilityCalendar = () => {
           </div>
         ))}
         {next14Days.map((day) => {
-          const hasAvailability = hasAvailabilityOn(day);
+          const hasMyAvailability = hasMyAvailabilityOn(day);
+          const othersCount = getOthersCountForDate(day);
+          const totalCount = getAvailabilitiesForDate(day).length;
           const isToday = isSameDay(day, new Date());
-          const availability = getAvailabilityForDate(day);
 
           return (
             <button
               key={day.toISOString()}
               onClick={() => {
-                if (hasAvailability && availability) {
-                  handleDeleteRange(format(day, 'yyyy-MM-dd'));
+                if (totalCount > 0) {
+                  openDateDetail(day);
                 }
               }}
               className={cn(
-                "aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors relative group",
+                "aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors relative",
                 isToday && "ring-2 ring-primary",
-                hasAvailability && "bg-success/20 text-success hover:bg-destructive/20 hover:text-destructive",
-                !hasAvailability && "bg-secondary text-muted-foreground"
+                hasMyAvailability && "bg-success/20 text-success",
+                !hasMyAvailability && othersCount > 0 && "bg-primary/10 text-primary",
+                !hasMyAvailability && othersCount === 0 && "bg-secondary text-muted-foreground"
               )}
-              title={hasAvailability ? "Cliquer pour supprimer" : ""}
             >
               <span className="font-medium">{format(day, 'd')}</span>
-              {hasAvailability && (
-                <Trash2 className="w-3 h-3 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+              {totalCount > 0 && (
+                <span className="text-[10px] flex items-center gap-0.5">
+                  <Users className="w-2.5 h-2.5" />
+                  {totalCount}
+                </span>
               )}
             </button>
           );
         })}
       </div>
 
-      {/* Upcoming availabilities list */}
-      {availabilities.length > 0 && (
+      {/* Legend */}
+      <div className="flex gap-4 text-xs text-muted-foreground mb-4">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-success/20" />
+          <span>Vous</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-primary/10" />
+          <span>Collègues</span>
+        </div>
+      </div>
+
+      {/* My upcoming availabilities list */}
+      {myAvailabilities.length > 0 && (
         <div className="space-y-2 max-h-32 overflow-y-auto">
-          <p className="text-xs text-muted-foreground mb-2">Prochaines disponibilités :</p>
-          {availabilities.slice(0, 5).map((availability) => (
+          <p className="text-xs text-muted-foreground mb-2">Mes disponibilités :</p>
+          {myAvailabilities.slice(0, 5).map((availability) => (
             <div 
               key={availability.id}
               className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2"
@@ -249,17 +317,17 @@ export const AvailabilityCalendar = () => {
               </Button>
             </div>
           ))}
-          {availabilities.length > 5 && (
+          {myAvailabilities.length > 5 && (
             <p className="text-xs text-muted-foreground text-center">
-              +{availabilities.length - 5} autres jours
+              +{myAvailabilities.length - 5} autres jours
             </p>
           )}
         </div>
       )}
 
-      {availabilities.length === 0 && !loading && (
+      {myAvailabilities.length === 0 && !loading && (
         <p className="text-sm text-muted-foreground text-center py-2">
-          Aucune disponibilité enregistrée
+          Vous n'avez pas de disponibilité enregistrée
         </p>
       )}
 
@@ -318,6 +386,52 @@ export const AvailabilityCalendar = () => {
                 {saving ? 'Enregistrement...' : 'Confirmer'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Date Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDate && format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr })}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Personnes disponibles :</p>
+            {selectedDate && getAvailabilitiesForDate(selectedDate).map((availability) => {
+              const isMe = availability.user_id === user?.id;
+              const name = profileNames[availability.user_id] || 'Chargement...';
+              
+              return (
+                <div 
+                  key={availability.id}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2",
+                    isMe ? "bg-success/10" : "bg-secondary/50"
+                  )}
+                >
+                  <span className="text-sm text-foreground">
+                    {isMe ? 'Vous' : name}
+                  </span>
+                  {isMe && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        handleDeleteAvailability(availability.id);
+                        setDetailDialogOpen(false);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
