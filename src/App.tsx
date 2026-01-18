@@ -8,7 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import HistoryPage from "./pages/HistoryPage";
-import MapPage from "./pages/MapPage";
+
 import StatsPage from "./pages/StatsPage";
 import AvailabilityPage from "./pages/AvailabilityPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -34,7 +34,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/history" element={<HistoryPage />} />
-            <Route path="/map" element={<MapPage />} />
+            
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/availability" element={<AvailabilityPage />} />
             <Route path="/profile" element={<ProfilePage />} />

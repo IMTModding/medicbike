@@ -10,6 +10,7 @@ import {
   respondToIntervention, 
   subscribeToInterventions,
   subscribeToResponses,
+  completeIntervention,
   Intervention 
 } from '@/services/interventions';
 import { AlertTriangle, CheckCircle2, Clock, Loader2, ChevronRight, Newspaper } from 'lucide-react';
@@ -121,6 +122,17 @@ const Index = () => {
     }
   };
 
+  const handleCompleteIntervention = async (id: string) => {
+    try {
+      await completeIntervention(id);
+      setInterventions(prev => prev.filter(intervention => intervention.id !== id));
+      toast.success('Intervention terminée');
+    } catch (error) {
+      console.error('Error completing intervention:', error);
+      toast.error('Erreur lors de la clôture');
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -225,6 +237,7 @@ const Index = () => {
               key={intervention.id}
               intervention={intervention}
               onStatusChange={handleStatusChange}
+              onComplete={handleCompleteIntervention}
             />
           ))}
         </div>

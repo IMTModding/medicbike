@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogOut, LayoutDashboard, History, MapPin, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, BarChart3, User, KeyRound, Users, MessageCircle, Newspaper } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -74,13 +74,6 @@ export const Header = () => {
             <MessageCircle className="w-4 h-4 text-foreground" />
           </button>
           
-          <button 
-            onClick={() => navigate('/map')}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
-            title="Carte"
-          >
-            <MapPin className="w-4 h-4 text-foreground" />
-          </button>
           
           <button 
             onClick={() => navigate('/stats')}

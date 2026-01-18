@@ -1,11 +1,13 @@
-import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation } from 'lucide-react';
+import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AlertCardProps {
   intervention: Intervention;
   onStatusChange: (id: string, status: 'available' | 'unavailable') => void;
+  onComplete?: (id: string) => void;
 }
 
 const getUrgencyConfig = (urgency: Intervention['urgency']) => {
@@ -46,7 +48,8 @@ const getTimeAgo = (dateString: string) => {
   return `Il y a ${Math.floor(diffHours / 24)}j`;
 };
 
-export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
+export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCardProps) => {
+  const { isAdmin } = useAuth();
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
   const timeAgo = getTimeAgo(intervention.created_at);
   
@@ -134,44 +137,70 @@ export const AlertCard = ({ intervention, onStatusChange }: AlertCardProps) => {
 
       {/* Action Buttons */}
       {isResponded ? (
-        <div className={cn(
-          "flex items-center justify-center gap-2 py-3 rounded-lg",
-          intervention.userStatus === 'available' 
-            ? "bg-success/10 text-success" 
-            : "bg-muted text-muted-foreground"
-        )}>
-          {intervention.userStatus === 'available' ? (
-            <>
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-medium">Vous êtes disponible</span>
-            </>
-          ) : (
-            <>
-              <XCircle className="w-5 h-5" />
-              <span className="font-medium">Indisponible</span>
-            </>
+        <div className="space-y-2">
+          <div className={cn(
+            "flex items-center justify-center gap-2 py-3 rounded-lg",
+            intervention.userStatus === 'available' 
+              ? "bg-success/10 text-success" 
+              : "bg-muted text-muted-foreground"
+          )}>
+            {intervention.userStatus === 'available' ? (
+              <>
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="font-medium">Vous êtes disponible</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-5 h-5" />
+                <span className="font-medium">Indisponible</span>
+              </>
+            )}
+          </div>
+          {isAdmin && onComplete && (
+            <Button
+              variant="success"
+              size="lg"
+              className="w-full"
+              onClick={() => onComplete(intervention.id)}
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Terminer l'intervention
+            </Button>
           )}
         </div>
       ) : (
-        <div className="flex gap-3">
-          <Button
-            variant="available"
-            size="xl"
-            className="flex-1"
-            onClick={() => onStatusChange(intervention.id, 'available')}
-          >
-            <CheckCircle2 />
-            Dispo
-          </Button>
-          <Button
-            variant="unavailable"
-            size="xl"
-            className="flex-1"
-            onClick={() => onStatusChange(intervention.id, 'unavailable')}
-          >
-            <XCircle />
-            Indisponible
-          </Button>
+        <div className="space-y-2">
+          <div className="flex gap-3">
+            <Button
+              variant="available"
+              size="xl"
+              className="flex-1"
+              onClick={() => onStatusChange(intervention.id, 'available')}
+            >
+              <CheckCircle2 />
+              Dispo
+            </Button>
+            <Button
+              variant="unavailable"
+              size="xl"
+              className="flex-1"
+              onClick={() => onStatusChange(intervention.id, 'unavailable')}
+            >
+              <XCircle />
+              Indisponible
+            </Button>
+          </div>
+          {isAdmin && onComplete && (
+            <Button
+              variant="success"
+              size="lg"
+              className="w-full"
+              onClick={() => onComplete(intervention.id)}
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Terminer l'intervention
+            </Button>
+          )}
         </div>
       )}
     </div>
