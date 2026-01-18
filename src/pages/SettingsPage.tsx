@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import LoginHistoryDialog from '@/components/LoginHistoryDialog';
 import TwoFactorSetup from '@/components/TwoFactorSetup';
 import { useTwoFactor } from '@/hooks/useTwoFactor';
+import { VehicleManager } from '@/components/VehicleManager';
 import { toast } from 'sonner';
 
 const SettingsPage = () => {
@@ -140,6 +141,9 @@ const SettingsPage = () => {
             )}
           </div>
         </div>
+
+        {/* Gestion des motos - Admin only */}
+        {isAdmin && <VehicleManager />}
 
         {/* Sécurité */}
         <div className="bg-card rounded-xl border border-border p-4">
