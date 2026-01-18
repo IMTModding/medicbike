@@ -48,29 +48,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // If auth init hangs (offline, blocked third-party storage, etc.), don't keep users stuck.
+    // If auth init hangs (offline, blocked storage, etc.), don't keep users stuck.
     const timeoutId = window.setTimeout(() => {
       if (!isMounted) return;
-      setInitError('Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez.');
+      setInitError((prev) =>
+        prev ??
+        "Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez."
+      );
       setLoading(false);
     }, 8000);
 
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
 
-        if (session?.user) {
-          // Defer backend calls with setTimeout
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-          }, 0);
-        } else {
-          setRole(null);
-        }
+      if (session?.user) {
+        // Defer backend calls with setTimeout
+        setTimeout(() => {
+          fetchUserRole(session.user.id);
+        }, 0);
+      } else {
+        setRole(null);
       }
-    );
+    });
 
     (async () => {
       try {
@@ -89,7 +90,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (e) {
         if (!isMounted) return;
-        setInitError('Erreur lors de l\'initialisation. Réessayez.');
+        window.clearTimeout(timeoutId);
+        // Don't overwrite the timeout/offline message if it already displayed
+        setInitError((prev) => prev ?? "Erreur lors de l'initialisation. Réessayez.");
       } finally {
         if (!isMounted) return;
         setLoading(false);
