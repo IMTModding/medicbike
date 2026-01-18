@@ -88,7 +88,10 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
 
         const { error: uploadError } = await supabase.storage
           .from('news')
-          .upload(filePath, selectedImage);
+          .upload(filePath, selectedImage, {
+            contentType: selectedImage.type || undefined,
+            upsert: false,
+          });
 
         if (uploadError) throw uploadError;
 
@@ -125,9 +128,13 @@ export const CreateNewsDialog = ({ onCreated }: CreateNewsDialogProps) => {
       setSelectedImage(null);
       setImagePreview(null);
       onCreated?.();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error creating news:', error);
-      toast.error('Erreur lors de la publication');
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as any).message)
+          : 'Erreur inconnue';
+      toast.error(`Erreur lors de la publication : ${message}`);
     } finally {
       setLoading(false);
     }
