@@ -1,17 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Navigation } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Navigation, Bike, User, Trash2 } from 'lucide-react';
 import { createIntervention, Urgency } from '@/services/interventions';
 import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface CreateAlertDialogProps {
   onCreated: () => void;
+}
+
+interface Vehicle {
+  id: string;
+  name: string;
+}
+
+interface Profile {
+  user_id: string;
+  full_name: string | null;
+}
+
+interface Assignment {
+  id: string;
+  userId: string;
+  vehicleId: string;
 }
 
 export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
@@ -27,9 +45,89 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [urgency] = useState<Urgency>('high');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   
+  // New state for assignments
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [employees, setEmployees] = useState<Profile[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [selectedVehicle, setSelectedVehicle] = useState<string>('');
+  
   const { user } = useAuth();
 
   const fullAddress = [numero, rue, codePostal, ville].filter(Boolean).join(' ').trim();
+
+  // Fetch vehicles and employees when dialog opens
+  useEffect(() => {
+    if (open && user) {
+      fetchVehiclesAndEmployees();
+    }
+  }, [open, user]);
+
+  const fetchVehiclesAndEmployees = async () => {
+    if (!user) return;
+
+    // Fetch vehicles
+    const { data: vehiclesData } = await supabase
+      .from('vehicles')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (vehiclesData) {
+      setVehicles(vehiclesData);
+    }
+
+    // Fetch employees from organization
+    const { data: profilesData } = await supabase
+      .rpc('get_organization_profiles', { p_user_id: user.id });
+    
+    if (profilesData) {
+      setEmployees(profilesData.filter((p: Profile) => p.user_id !== user.id));
+    }
+  };
+
+  const addAssignment = () => {
+    if (!selectedEmployee || !selectedVehicle) {
+      toast.error('Sélectionnez un employé et une moto');
+      return;
+    }
+
+    // Check if this employee already has an assignment
+    if (assignments.some(a => a.userId === selectedEmployee)) {
+      toast.error('Cet employé a déjà une affectation');
+      return;
+    }
+
+    // Check if this vehicle is already assigned
+    if (assignments.some(a => a.vehicleId === selectedVehicle)) {
+      toast.error('Cette moto est déjà affectée');
+      return;
+    }
+
+    setAssignments([
+      ...assignments,
+      {
+        id: crypto.randomUUID(),
+        userId: selectedEmployee,
+        vehicleId: selectedVehicle,
+      }
+    ]);
+
+    setSelectedEmployee('');
+    setSelectedVehicle('');
+  };
+
+  const removeAssignment = (id: string) => {
+    setAssignments(assignments.filter(a => a.id !== id));
+  };
+
+  const getEmployeeName = (userId: string) => {
+    return employees.find(e => e.user_id === userId)?.full_name || 'Inconnu';
+  };
+
+  const getVehicleName = (vehicleId: string) => {
+    return vehicles.find(v => v.id === vehicleId)?.name || 'Inconnu';
+  };
 
   const openGPSNavigation = () => {
     if (fullAddress) {
@@ -49,22 +147,55 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setLoading(true);
     
     try {
-      await createIntervention({
-        title: title.trim(),
-        location: fullAddress,
-        description: description.trim() || undefined,
-        urgency,
-        created_by: user.id,
-      });
+      // Create intervention
+      const { data: interventionData, error: interventionError } = await supabase
+        .from('interventions')
+        .insert({
+          title: title.trim(),
+          location: fullAddress,
+          description: description.trim() || null,
+          urgency,
+          created_by: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (interventionError) throw interventionError;
+
+      // Create assignments if any
+      if (assignments.length > 0 && interventionData) {
+        const assignmentsToInsert = assignments.map(a => ({
+          intervention_id: interventionData.id,
+          user_id: a.userId,
+          vehicle_id: a.vehicleId,
+        }));
+
+        const { error: assignmentError } = await supabase
+          .from('intervention_assignments')
+          .insert(assignmentsToInsert);
+
+        if (assignmentError) {
+          console.error('Error creating assignments:', assignmentError);
+        }
+      }
       
+      // Build notification message with assignments
+      let notifBody = `📍 ${fullAddress}`;
+      if (assignments.length > 0) {
+        const assignmentsList = assignments
+          .map(a => `${getEmployeeName(a.userId)} → ${getVehicleName(a.vehicleId)}`)
+          .join(', ');
+        notifBody += `\n🏍️ ${assignmentsList}`;
+      }
+
       // Send push notification to all employees
       const notifTitle = `🚨 URGENT: ${title.trim()}`;
       
       await sendPushNotification(
         notifTitle,
-        `📍 ${fullAddress}`,
+        notifBody,
         urgency,
-        crypto.randomUUID()
+        interventionData?.id || crypto.randomUUID()
       );
       
       setSuccess(true);
@@ -91,6 +222,9 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setCodePostal('');
     setVille('');
     setDescription('');
+    setAssignments([]);
+    setSelectedEmployee('');
+    setSelectedVehicle('');
     setLoading(false);
     setSuccess(false);
     setFocusedField(null);
@@ -104,6 +238,14 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   };
 
   const isFormValid = title.trim() && rue.trim() && ville.trim();
+
+  // Filter out already assigned employees and vehicles
+  const availableEmployees = employees.filter(
+    e => !assignments.some(a => a.userId === e.user_id)
+  );
+  const availableVehicles = vehicles.filter(
+    v => !assignments.some(a => a.vehicleId === v.id)
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -267,6 +409,91 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                   )}
                   rows={3}
                 />
+              </div>
+
+              {/* Vehicle Assignments Section */}
+              <div className="space-y-3">
+                <label className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Bike className="w-3.5 h-3.5" />
+                  Affectation motos (optionnel)
+                </label>
+
+                {/* Current assignments */}
+                {assignments.length > 0 && (
+                  <div className="space-y-2">
+                    {assignments.map(assignment => (
+                      <div 
+                        key={assignment.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20"
+                      >
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="w-4 h-4 text-primary" />
+                          <span className="font-medium">{getEmployeeName(assignment.userId)}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <Bike className="w-4 h-4 text-primary" />
+                          <span>{getVehicleName(assignment.vehicleId)}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAssignment(assignment.id)}
+                          className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new assignment */}
+                {availableEmployees.length > 0 && availableVehicles.length > 0 && (
+                  <div className="flex gap-2">
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="flex-1 bg-secondary border-border">
+                        <SelectValue placeholder="Employé" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableEmployees.map(employee => (
+                          <SelectItem key={employee.user_id} value={employee.user_id}>
+                            {employee.full_name || 'Sans nom'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
+                      <SelectTrigger className="flex-1 bg-secondary border-border">
+                        <SelectValue placeholder="Moto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableVehicles.map(vehicle => (
+                          <SelectItem key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={addAssignment}
+                      disabled={!selectedEmployee || !selectedVehicle}
+                      className="shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {vehicles.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    Aucune moto configurée. Ajoutez des motos dans les paramètres.
+                  </p>
+                )}
               </div>
               
               {/* Urgency Badge - Fixed to Urgent */}
