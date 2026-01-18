@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePresence } from '@/contexts/PresenceContext';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,10 +41,6 @@ interface Employee {
   role?: string;
 }
 
-interface PresenceState {
-  [key: string]: { user_id: string; online_at: string }[];
-}
-
 interface Availability {
   user_id: string;
   start_time: string;
@@ -52,13 +49,13 @@ interface Availability {
 
 const EmployeesPage = () => {
   const { user, isAdmin, loading } = useAuth();
+  const { isUserOnline, getUserPresence } = usePresence();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [todayAvailabilities, setTodayAvailabilities] = useState<Map<string, Availability>>(new Map());
   const [resetPasswordEmployee, setResetPasswordEmployee] = useState<Employee | null>(null);
 
@@ -75,41 +72,6 @@ const EmployeesPage = () => {
       fetchEmployees();
       fetchTodayAvailabilities();
     }
-  }, [user, isAdmin]);
-
-  // Real-time presence tracking
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const channel = supabase.channel('employees-presence');
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState() as PresenceState;
-        const online = new Set<string>();
-        
-        Object.values(state).forEach((presences) => {
-          presences.forEach((presence) => {
-            if (presence.user_id) {
-              online.add(presence.user_id);
-            }
-          });
-        });
-        
-        setOnlineUsers(online);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED' && user) {
-          await channel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
-
-    return () => {
-      channel.unsubscribe();
-    };
   }, [user, isAdmin]);
 
   useEffect(() => {
@@ -232,11 +194,18 @@ const EmployeesPage = () => {
   };
 
   const getEmployeeStatus = (userId: string) => {
-    const isOnline = onlineUsers.has(userId);
+    const online = isUserOnline(userId);
     const availability = todayAvailabilities.get(userId);
+    const presence = getUserPresence(userId);
     
-    if (isOnline) {
-      return { label: 'En ligne', color: 'bg-green-500', textColor: 'text-green-500' };
+    if (online) {
+      const pageName = presence?.current_page || '';
+      const pageLabel = getPageLabel(pageName);
+      return { 
+        label: pageLabel ? `En ligne - ${pageLabel}` : 'En ligne', 
+        color: 'bg-green-500', 
+        textColor: 'text-green-500' 
+      };
     }
     
     if (availability) {
@@ -268,6 +237,24 @@ const EmployeesPage = () => {
     return { label: 'Hors ligne', color: 'bg-muted-foreground', textColor: 'text-muted-foreground' };
   };
 
+  const getPageLabel = (path: string): string => {
+    const pageMap: Record<string, string> = {
+      '/': 'Accueil',
+      '/admin': 'Admin',
+      '/employees': 'Employés',
+      '/history': 'Historique',
+      '/stats': 'Statistiques',
+      '/availability': 'Disponibilités',
+      '/profile': 'Profil',
+      '/general-chat': 'Chat',
+      '/news': 'Actualités',
+      '/settings': 'Paramètres',
+    };
+    
+    if (path.startsWith('/chat/')) return 'Chat intervention';
+    return pageMap[path] || '';
+  };
+
   if (loading || loadingEmployees) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -277,7 +264,7 @@ const EmployeesPage = () => {
   }
 
   // Count stats
-  const onlineCount = employees.filter(e => onlineUsers.has(e.user_id)).length;
+  const onlineCount = employees.filter(e => isUserOnline(e.user_id)).length;
   const availableCount = employees.filter(e => {
     const av = todayAvailabilities.get(e.user_id);
     if (!av) return false;

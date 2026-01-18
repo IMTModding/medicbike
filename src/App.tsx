@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PresenceProvider } from "@/contexts/PresenceContext";
 import { RealtimeNotificationProvider } from "@/components/RealtimeNotificationProvider";
 import { PWAUpdateBanner } from "@/components/PWAUpdateBanner";
 import Index from "./pages/Index";
@@ -33,27 +34,29 @@ const App = () => {
           <Sonner />
           <PWAUpdateBanner />
           <BrowserRouter>
-            <RealtimeNotificationProvider>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/history" element={<HistoryPage />} />
-                
-                <Route path="/stats" element={<StatsPage />} />
-                <Route path="/availability" element={<AvailabilityPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/chat/:interventionId" element={<ChatPage />} />
-                <Route path="/invite-codes" element={<InviteCodesPage />} />
-                <Route path="/employees" element={<EmployeesPage />} />
-                <Route path="/general-chat" element={<GeneralChatPage />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/news" element={<NewsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </RealtimeNotificationProvider>
+            <PresenceProvider>
+              <RealtimeNotificationProvider>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/history" element={<HistoryPage />} />
+                  
+                  <Route path="/stats" element={<StatsPage />} />
+                  <Route path="/availability" element={<AvailabilityPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/chat/:interventionId" element={<ChatPage />} />
+                  <Route path="/invite-codes" element={<InviteCodesPage />} />
+                  <Route path="/employees" element={<EmployeesPage />} />
+                  <Route path="/general-chat" element={<GeneralChatPage />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/news" element={<NewsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </RealtimeNotificationProvider>
+            </PresenceProvider>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
