@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ExportHistoryDialog from '@/components/ExportHistoryDialog';
+import { HistoryPageSkeleton } from '@/components/PageSkeleton';
 import {
   Select,
   SelectContent,
@@ -129,10 +130,35 @@ const HistoryPage = () => {
 
   const hasActiveFilters = searchQuery || urgencyFilter !== 'all' || startDate || endDate;
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Show skeleton while loading data
+  if (loading && user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+          <div className="container flex items-center justify-between h-16 px-4">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate('/')}
+                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="font-bold text-lg text-foreground">Historique</h1>
+                <p className="text-xs text-muted-foreground">Interventions terminées</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <HistoryPageSkeleton />
       </div>
     );
   }
