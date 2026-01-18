@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { LogOut, LayoutDashboard, History, MapPin, BarChart3, User, KeyRound, Users, MessageCircle } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { NotificationToggle } from '@/components/NotificationToggle';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +14,27 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const Header = () => {
-  const { signOut, role, isAdmin } = useAuth();
+  const { signOut, role, isAdmin, user } = useAuth();
   const navigate = useNavigate();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    };
+    
+    fetchAvatar();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -65,10 +86,14 @@ export const Header = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button 
-                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent overflow-hidden"
                 title="Menu"
               >
-                <User className="w-5 h-5 text-foreground" />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5 text-foreground" />
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
