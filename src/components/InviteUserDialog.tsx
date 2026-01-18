@@ -170,40 +170,83 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
 
         {tempPassword ? (
           <div className="space-y-4">
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
-              <p className="text-sm text-warning font-medium mb-2">
-                ⚠️ L'email n'a pas pu être envoyé
+            <div className="bg-green-500/10 border-2 border-green-500/50 rounded-lg p-4">
+              <p className="text-lg text-green-600 dark:text-green-400 font-bold mb-1 flex items-center gap-2">
+                ✅ Utilisateur créé avec succès !
               </p>
-              <p className="text-sm text-muted-foreground mb-3">
-                Transmettez manuellement ces identifiants à l'utilisateur :
+              <p className="text-sm text-muted-foreground">
+                Transmettez ces identifiants à <strong>{fullName}</strong> :
               </p>
-              <div className="space-y-2 bg-background rounded p-3">
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Email :</span>{' '}
-                  <strong>{email}</strong>
-                </p>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm flex-1">
-                    <span className="text-muted-foreground">Mot de passe :</span>{' '}
-                    <strong className="font-mono">{tempPassword}</strong>
-                  </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Email section */}
+              <div className="bg-muted rounded-lg p-4 border">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Email de connexion</Label>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="font-mono text-base font-semibold">{email}</span>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(email);
+                      toast.success('Email copié !');
+                    }}
+                  >
+                    <Copy className="w-3 h-3" />
+                    Copier
+                  </Button>
+                </div>
+              </div>
+
+              {/* Password section - more prominent */}
+              <div className="bg-primary/10 rounded-lg p-4 border-2 border-primary/30">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Mot de passe temporaire</Label>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="font-mono text-xl font-bold text-primary">{tempPassword}</span>
+                  <Button
+                    variant={copied ? "default" : "outline"}
+                    size="sm"
+                    className="gap-2"
                     onClick={handleCopyPassword}
                   >
                     {copied ? (
-                      <Check className="w-4 h-4 text-success" />
+                      <>
+                        <Check className="w-3 h-3" />
+                        Copié !
+                      </>
                     ) : (
-                      <Copy className="w-4 h-4" />
+                      <>
+                        <Copy className="w-3 h-3" />
+                        Copier
+                      </>
                     )}
                   </Button>
                 </div>
               </div>
+
+              {/* Copy all button */}
+              <Button
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={async () => {
+                  const text = `Identifiants MedicBike\n\nEmail: ${email}\nMot de passe: ${tempPassword}\n\n⚠️ Pensez à changer votre mot de passe après la première connexion.`;
+                  await navigator.clipboard.writeText(text);
+                  toast.success('Identifiants complets copiés !');
+                }}
+              >
+                <Copy className="w-4 h-4" />
+                Copier tous les identifiants
+              </Button>
             </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              ⚠️ Conseillez à l'utilisateur de changer son mot de passe après la première connexion.
+            </p>
+
             <Button className="w-full" onClick={handleClose}>
-              Fermer
+              Terminé
             </Button>
           </div>
         ) : (
