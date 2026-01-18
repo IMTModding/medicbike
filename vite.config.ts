@@ -21,7 +21,8 @@ export default defineConfig(({ mode }) => ({
       strategies: "injectManifest",
       srcDir: "public",
       filename: "sw.js",
-      registerType: "autoUpdate",
+      // Use a prompt flow since we manage update UX ourselves.
+      registerType: "prompt",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
         name: "MEDICBIKE",
