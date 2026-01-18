@@ -49,13 +49,31 @@ serve(async (req) => {
     
     const senderUserId = user.id;
     
-    const { title, body, urgency, interventionId, type, organizationId, excludeUserId } = await req.json();
+    const { title, body, urgency, interventionId, type, organizationId, excludeUserId, newsId } = await req.json();
     
-    console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId, senderUserId });
+    console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId, newsId, senderUserId });
 
     let userIdsToNotify: string[] = [];
     
-    if (type === 'chat' && organizationId) {
+    if (type === 'news' && senderUserId) {
+      // For news notifications, notify all users in the admin's organization
+      const { data: inviteCode } = await supabase
+        .from('invite_codes')
+        .select('id')
+        .eq('admin_id', senderUserId)
+        .single();
+      
+      if (inviteCode?.id) {
+        // Get all employees in this organization
+        const { data: orgMembers } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('invite_code_id', inviteCode.id);
+        
+        userIdsToNotify = (orgMembers || []).map(p => p.user_id);
+        console.log('News - Users to notify:', userIdsToNotify.length);
+      }
+    } else if (type === 'chat' && organizationId) {
       // For chat notifications, notify users in the same organization
       const { data: orgProfiles } = await supabase
         .from('profiles')
@@ -150,18 +168,31 @@ serve(async (req) => {
 
     console.log(`Found ${subscriptions?.length || 0} subscriptions to notify`);
 
+    const getNotificationUrl = () => {
+      if (type === 'chat') return '/general-chat';
+      if (type === 'news') return '/news';
+      return '/';
+    };
+
+    const getNotificationTag = () => {
+      if (type === 'chat') return `chat-${organizationId}`;
+      if (type === 'news') return `news-${newsId}`;
+      return `intervention-${interventionId}`;
+    };
+
     const payload = JSON.stringify({
       title,
       body,
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
-      tag: type === 'chat' ? `chat-${organizationId}` : `intervention-${interventionId}`,
+      tag: getNotificationTag(),
       requireInteraction: urgency === 'high',
       data: {
         interventionId,
         urgency,
         type,
-        url: type === 'chat' ? '/general-chat' : '/',
+        newsId,
+        url: getNotificationUrl(),
       },
     });
 
