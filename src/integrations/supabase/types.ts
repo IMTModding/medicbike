@@ -394,6 +394,20 @@ export type Database = {
     }
     Functions: {
       generate_invite_code: { Args: never; Returns: string }
+      get_organization_profiles: {
+        Args: { p_user_id: string }
+        Returns: {
+          admin_id: string
+          avatar_url: string
+          created_at: string
+          full_name: string
+          id: string
+          invite_code_id: string
+          onboarding_completed: boolean
+          phone: string
+          user_id: string
+        }[]
+      }
       get_user_organization_info: {
         Args: { user_id_param: string }
         Returns: {
