@@ -90,13 +90,19 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate('/auth');
-      } else if (role !== 'admin') {
-        navigate('/');
-        toast.error('Accès réservé aux administrateurs');
-      }
+    if (authLoading) return;
+
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    // Wait for role to be loaded before enforcing admin-only access
+    if (role === null) return;
+
+    if (role !== 'admin') {
+      navigate('/');
+      toast.error('Accès réservé aux administrateurs');
     }
   }, [user, authLoading, role, navigate]);
 
