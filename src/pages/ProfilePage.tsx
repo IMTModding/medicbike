@@ -119,12 +119,18 @@ const ProfilePage = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: fullName, phone: phone })
-        .eq('user_id', user.id);
+      const [profileUpdate, contactsUpsert] = await Promise.all([
+        supabase
+          .from('profiles')
+          .update({ full_name: fullName })
+          .eq('user_id', user.id),
+        supabase
+          .from('profile_contacts')
+          .upsert({ user_id: user.id, phone }, { onConflict: 'user_id' }),
+      ]);
 
-      if (error) throw error;
+      if (profileUpdate.error) throw profileUpdate.error;
+      if (contactsUpsert.error) throw contactsUpsert.error;
 
       toast.success('Profil mis à jour');
     } catch (error) {
