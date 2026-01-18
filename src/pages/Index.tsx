@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { AlertCard } from '@/components/AlertCard';
 import { CreateAlertDialog } from '@/components/CreateAlertDialog';
+import Onboarding from '@/components/Onboarding';
+import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   fetchInterventions, 
@@ -30,20 +34,39 @@ const Index = () => {
   
   const { user, loading: authLoading, role, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const { showOnboarding, completeOnboarding } = useOnboarding();
+  const { isOnline, cacheInterventions, getCacheTimestamp, cachedInterventions } = useOfflineMode();
 
   const loadInterventions = useCallback(async () => {
     if (!user) return;
     
+    if (!isOnline) {
+      // Use cached data when offline
+      setInterventions(cachedInterventions as Intervention[]);
+      setLoading(false);
+      return;
+    }
+    
     try {
       const data = await fetchInterventions(user.id);
       setInterventions(data);
+      // Cache interventions for offline use
+      cacheInterventions(data.map(i => ({
+        id: i.id,
+        title: i.title,
+        location: i.location,
+        status: i.status,
+        urgency: i.urgency,
+        created_at: i.created_at,
+        description: i.description || undefined
+      })));
     } catch (error) {
       console.error('Error loading interventions:', error);
       toast.error('Erreur lors du chargement des alertes');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, isOnline, cachedInterventions, cacheInterventions]);
 
   const loadLatestNews = useCallback(async () => {
     try {
@@ -162,7 +185,17 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
+      {/* Onboarding */}
+      <Onboarding open={showOnboarding} onComplete={completeOnboarding} />
+      
       <main className="container px-4 py-6 pb-24">
+        {/* Offline Banner */}
+        {!isOnline && (
+          <OfflineBanner 
+            cacheTimestamp={getCacheTimestamp()} 
+            onRefresh={() => window.location.reload()} 
+          />
+        )}
         {/* News Banner */}
         {latestNews.length > 0 && (
           <div 
