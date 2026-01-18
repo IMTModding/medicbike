@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { AlertCard } from '@/components/AlertCard';
 import { CreateAlertDialog } from '@/components/CreateAlertDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   fetchInterventions, 
   respondToIntervention, 
@@ -11,12 +12,20 @@ import {
   subscribeToResponses,
   Intervention 
 } from '@/services/interventions';
-import { AlertTriangle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Loader2, ChevronRight, Newspaper } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface NewsItem {
+  id: string;
+  title: string;
+  image_url: string | null;
+  created_at: string;
+}
 
 const Index = () => {
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [loading, setLoading] = useState(true);
+  const [latestNews, setLatestNews] = useState<NewsItem[]>([]);
   
   const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
@@ -35,6 +44,21 @@ const Index = () => {
     }
   }, [user]);
 
+  const loadLatestNews = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('news')
+        .select('id, title, image_url, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setLatestNews(data || []);
+    } catch (error) {
+      console.error('Error loading news:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
@@ -44,6 +68,7 @@ const Index = () => {
   useEffect(() => {
     if (user) {
       loadInterventions();
+      loadLatestNews();
       
       // Subscribe to realtime updates for interventions
       const interventionsChannel = subscribeToInterventions(() => {
@@ -56,13 +81,22 @@ const Index = () => {
         console.log('Realtime: Response updated');
         loadInterventions();
       });
+
+      // Subscribe to news updates
+      const newsChannel = supabase
+        .channel('news-home')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'news' }, () => {
+          loadLatestNews();
+        })
+        .subscribe();
       
       return () => {
         interventionsChannel.unsubscribe();
         responsesChannel.unsubscribe();
+        newsChannel.unsubscribe();
       };
     }
-  }, [user, loadInterventions]);
+  }, [user, loadInterventions, loadLatestNews]);
 
   const handleStatusChange = async (id: string, status: 'available' | 'unavailable') => {
     if (!user) return;
@@ -117,6 +151,38 @@ const Index = () => {
       <Header />
       
       <main className="container px-4 py-6 pb-24">
+        {/* News Banner */}
+        {latestNews.length > 0 && (
+          <div 
+            onClick={() => navigate('/news')}
+            className="mb-6 bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3 p-3 bg-primary/10">
+              <Newspaper className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium text-foreground">Actualités</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+            </div>
+            <div className="flex overflow-x-auto gap-3 p-3 scrollbar-hide">
+              {latestNews.map((item) => (
+                <div key={item.id} className="flex-shrink-0 w-32">
+                  {item.image_url ? (
+                    <img 
+                      src={item.image_url} 
+                      alt={item.title}
+                      className="w-32 h-20 object-cover rounded-lg mb-2"
+                    />
+                  ) : (
+                    <div className="w-32 h-20 bg-muted rounded-lg mb-2 flex items-center justify-center">
+                      <Newspaper className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <p className="text-xs text-foreground line-clamp-2 font-medium">{item.title}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-card rounded-xl p-3 border border-border">
