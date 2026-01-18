@@ -18,12 +18,13 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import InviteUserDialog from '@/components/InviteUserDialog';
+import CreateInviteCodeDialog from '@/components/CreateInviteCodeDialog';
 
 interface Employee {
   id: string;
@@ -295,7 +296,10 @@ const EmployeesPage = () => {
               {employees.length} employé{employees.length > 1 ? 's' : ''} dans votre organisation
             </p>
           </div>
-          <InviteUserDialog onUserInvited={fetchEmployees} />
+          <div className="flex gap-2">
+            <CreateInviteCodeDialog />
+            <InviteUserDialog onUserInvited={fetchEmployees} />
+          </div>
         </div>
 
         {/* Stats cards */}
