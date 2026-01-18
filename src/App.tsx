@@ -17,6 +17,7 @@ import InviteCodesPage from "./pages/InviteCodesPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import GeneralChatPage from "./pages/GeneralChatPage";
 import ResetPassword from "./pages/ResetPassword";
+import NewsPage from "./pages/NewsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/general-chat" element={<GeneralChatPage />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/news" element={<NewsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

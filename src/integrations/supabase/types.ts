@@ -206,6 +206,39 @@ export type Database = {
         }
         Relationships: []
       }
+      news: {
+        Row: {
+          admin_id: string
+          content: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          published: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          published?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          published?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_id: string | null
