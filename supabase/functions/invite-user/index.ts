@@ -125,14 +125,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // Update profile with invite code if employee
+    // Update profile with organization linkage
     if (role === "employee" && inviteCodeId) {
       const { error: updateProfileError } = await supabaseAdmin
         .from("profiles")
-        .update({ 
+        .update({
           invite_code_id: inviteCodeId,
           admin_id: userData.user.id,
-          email: email
         })
         .eq("user_id", newUser.user.id);
 
@@ -143,25 +142,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // For admin, set admin_id to themselves
       const { error: updateProfileError } = await supabaseAdmin
         .from("profiles")
-        .update({ 
+        .update({
           admin_id: newUser.user.id,
-          email: email
         })
         .eq("user_id", newUser.user.id);
 
       if (updateProfileError) {
         console.error("Error updating admin profile:", updateProfileError);
       }
-    } else {
-      // Just update email for any other case
-      const { error: updateProfileError } = await supabaseAdmin
-        .from("profiles")
-        .update({ email: email })
-        .eq("user_id", newUser.user.id);
+    }
 
-      if (updateProfileError) {
-        console.error("Error updating profile email:", updateProfileError);
-      }
+    // Store contact info in profile_contacts (profiles table does not contain email/phone)
+    const { error: contactError } = await supabaseAdmin
+      .from("profile_contacts")
+      .upsert(
+        {
+          user_id: newUser.user.id,
+          email,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (contactError) {
+      console.error("Error updating profile contacts:", contactError);
     }
 
     // Send invitation email using fetch to Resend API
