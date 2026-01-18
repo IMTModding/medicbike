@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { AlertCard } from '@/components/AlertCard';
 import { CreateAlertDialog } from '@/components/CreateAlertDialog';
 import Onboarding from '@/components/Onboarding';
+import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -156,10 +157,20 @@ const Index = () => {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Show skeleton while loading data (after auth is ready)
+  if (loading && user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <IndexPageSkeleton />
       </div>
     );
   }
