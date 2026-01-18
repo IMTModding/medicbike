@@ -216,12 +216,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.warn("RESEND_API_KEY not configured, skipping email");
     }
 
+    // Always return the tempPassword so admin can share it manually if email fails
     return new Response(
       JSON.stringify({ 
         success: true, 
         userId: newUser.user.id,
-        message: emailSent ? "Utilisateur créé et invitation envoyée" : "Utilisateur créé",
-        tempPassword: emailSent ? undefined : tempPassword
+        emailSent,
+        message: emailSent 
+          ? "Utilisateur créé et invitation envoyée par email" 
+          : "Utilisateur créé (email non envoyé - partagez les identifiants manuellement)",
+        tempPassword // Always include for manual sharing
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -103,14 +103,17 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
         throw new Error(errorMessage);
       }
 
-      // If tempPassword is returned (email not configured / email failed), show it
+      // Always show credentials if tempPassword is returned
       if (response.data?.tempPassword) {
         setTempPassword(response.data.tempPassword);
-        toast.success('Utilisateur créé ! Copiez les identifiants ci-dessous.');
+        if (response.data.emailSent) {
+          toast.success('Utilisateur créé et email envoyé ! Identifiants disponibles ci-dessous.');
+        } else {
+          toast.success('Utilisateur créé ! Copiez les identifiants ci-dessous (email non envoyé).');
+        }
       } else {
-        // If we get here, the backend didn't provide a temp password.
-        // In that case we cannot show credentials, so keep the dialog open and show a clear message.
-        toast.success('Invitation envoyée par email !');
+        // Fallback - should not happen with updated edge function
+        toast.success('Utilisateur créé !');
         resetForm();
         setOpen(false);
       }
