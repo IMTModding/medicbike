@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { format, addDays, isSameDay, startOfDay } from 'date-fns';
+import { format, addDays, isSameDay, startOfDay, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isToday, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Calendar, Plus, Trash2, X, Users } from 'lucide-react';
+import { Calendar, Plus, Trash2, X, Users, ChevronLeft, ChevronRight, Clock, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,7 @@ import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Availability {
   id: string;
@@ -44,6 +45,8 @@ export const AvailabilityCalendar = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
   const loadAvailabilities = async () => {
     if (!user) return;
@@ -64,7 +67,7 @@ export const AvailabilityCalendar = () => {
       const { data: allData, error: allError } = await supabase
         .from('availabilities')
         .select('*')
-        .gte('date', format(new Date(), 'yyyy-MM-dd'))
+        .gte('date', format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'))
         .order('date', { ascending: true });
 
       if (allError) throw allError;
@@ -185,23 +188,14 @@ export const AvailabilityCalendar = () => {
     }
   };
 
-  const handleDeleteRange = async (date: string) => {
-    try {
-      const { error } = await supabase
-        .from('availabilities')
-        .delete()
-        .eq('user_id', user?.id)
-        .eq('date', date);
-
-      if (error) throw error;
-
-      toast.success('Disponibilité supprimée');
-      loadAvailabilities();
-    } catch (error) {
-      console.error('Error deleting availability:', error);
-      toast.error('Erreur lors de la suppression');
-    }
-  };
+  // Generate days for current month view
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Add padding days for start of month
+  const startDayOfWeek = getDay(monthStart);
+  const paddingDays = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Monday = 0
 
   // Generate next 14 days for quick view
   const next14Days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
@@ -224,6 +218,66 @@ export const AvailabilityCalendar = () => {
     setDetailDialogOpen(true);
   };
 
+  const formatTime = (time: string) => {
+    return time.substring(0, 5);
+  };
+
+  const renderDayCell = (day: Date, isMonthView: boolean = false) => {
+    const hasMyAvailability = hasMyAvailabilityOn(day);
+    const othersCount = getOthersCountForDate(day);
+    const totalCount = getAvailabilitiesForDate(day).length;
+    const isPast = isBefore(day, startOfDay(new Date()));
+    const isTodayDate = isToday(day);
+
+    return (
+      <button
+        key={day.toISOString()}
+        onClick={() => {
+          if (totalCount > 0) {
+            openDateDetail(day);
+          }
+        }}
+        disabled={isPast && totalCount === 0}
+        className={cn(
+          "rounded-lg flex flex-col items-center justify-center text-xs transition-all relative",
+          isMonthView ? "aspect-square p-1" : "aspect-square",
+          isTodayDate && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+          hasMyAvailability && othersCount > 0 && "bg-gradient-to-br from-success/30 to-primary/30",
+          hasMyAvailability && othersCount === 0 && "bg-success/20 text-success",
+          !hasMyAvailability && othersCount > 0 && "bg-primary/15 text-primary",
+          !hasMyAvailability && othersCount === 0 && "bg-secondary/50 text-muted-foreground",
+          isPast && "opacity-50",
+          totalCount > 0 && "cursor-pointer hover:scale-105 hover:shadow-md"
+        )}
+      >
+        <span className={cn("font-semibold", isMonthView ? "text-[11px]" : "text-xs")}>
+          {format(day, 'd')}
+        </span>
+        {totalCount > 0 && (
+          <div className="flex items-center gap-0.5 mt-0.5">
+            <Users className={cn(isMonthView ? "w-2 h-2" : "w-2.5 h-2.5")} />
+            <span className={cn(isMonthView ? "text-[9px]" : "text-[10px]")}>{totalCount}</span>
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  // Group availabilities by user for the upcoming list
+  const upcomingByUser = () => {
+    const grouped: Record<string, Availability[]> = {};
+    allAvailabilities
+      .filter(a => !isBefore(parseISO(a.date), startOfDay(new Date())))
+      .slice(0, 50)
+      .forEach(a => {
+        if (!grouped[a.user_id]) {
+          grouped[a.user_id] = [];
+        }
+        grouped[a.user_id].push(a);
+      });
+    return grouped;
+  };
+
   return (
     <div className="bg-card rounded-xl border border-border p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
@@ -242,94 +296,147 @@ export const AvailabilityCalendar = () => {
         </Button>
       </div>
 
-      {/* Quick 14-day view */}
-      <div className="grid grid-cols-7 gap-1.5 mb-4">
-        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
-          <div key={i} className="text-center text-xs text-muted-foreground font-medium py-1">
-            {day}
-          </div>
-        ))}
-        {next14Days.map((day) => {
-          const hasMyAvailability = hasMyAvailabilityOn(day);
-          const othersCount = getOthersCountForDate(day);
-          const totalCount = getAvailabilitiesForDate(day).length;
-          const isToday = isSameDay(day, new Date());
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="week">2 semaines</TabsTrigger>
+          <TabsTrigger value="month">Mois</TabsTrigger>
+        </TabsList>
 
-          return (
-            <button
-              key={day.toISOString()}
-              onClick={() => {
-                if (totalCount > 0) {
-                  openDateDetail(day);
-                }
-              }}
-              className={cn(
-                "aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors relative",
-                isToday && "ring-2 ring-primary",
-                hasMyAvailability && "bg-success/20 text-success",
-                !hasMyAvailability && othersCount > 0 && "bg-primary/10 text-primary",
-                !hasMyAvailability && othersCount === 0 && "bg-secondary text-muted-foreground"
-              )}
+        <TabsContent value="week" className="mt-0">
+          {/* Quick 14-day view */}
+          <div className="grid grid-cols-7 gap-1.5 mb-4">
+            {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
+              <div key={i} className="text-center text-xs text-muted-foreground font-medium py-1">
+                {day}
+              </div>
+            ))}
+            {next14Days.map((day) => renderDayCell(day))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="month" className="mt-0">
+          {/* Month navigation */}
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
             >
-              <span className="font-medium">{format(day, 'd')}</span>
-              {totalCount > 0 && (
-                <span className="text-[10px] flex items-center gap-0.5">
-                  <Users className="w-2.5 h-2.5" />
-                  {totalCount}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="font-medium text-foreground capitalize">
+              {format(currentMonth, 'MMMM yyyy', { locale: fr })}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Month grid */}
+          <div className="grid grid-cols-7 gap-1 mb-4">
+            {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
+              <div key={i} className="text-center text-[10px] text-muted-foreground font-medium py-1">
+                {day}
+              </div>
+            ))}
+            {/* Padding for start of month */}
+            {Array.from({ length: paddingDays }).map((_, i) => (
+              <div key={`pad-${i}`} className="aspect-square" />
+            ))}
+            {monthDays.map((day) => renderDayCell(day, true))}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Legend */}
-      <div className="flex gap-4 text-xs text-muted-foreground mb-4">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-success/20" />
-          <span>Vous</span>
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mb-4 pt-2 border-t border-border">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-success/20 border border-success/30" />
+          <span>Vous seul</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-primary/10" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-primary/15 border border-primary/30" />
           <span>Collègues</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-gradient-to-br from-success/30 to-primary/30 border border-primary/30" />
+          <span>Vous + collègues</span>
         </div>
       </div>
 
-      {/* My upcoming availabilities list */}
-      {myAvailabilities.length > 0 && (
-        <div className="space-y-2 max-h-32 overflow-y-auto">
-          <p className="text-xs text-muted-foreground mb-2">Mes disponibilités :</p>
-          {myAvailabilities.slice(0, 5).map((availability) => (
-            <div 
-              key={availability.id}
-              className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2"
-            >
-              <span className="text-sm text-foreground">
-                {format(new Date(availability.date), 'EEEE d MMMM', { locale: fr })}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                onClick={() => handleDeleteAvailability(availability.id)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-          {myAvailabilities.length > 5 && (
-            <p className="text-xs text-muted-foreground text-center">
-              +{myAvailabilities.length - 5} autres jours
-            </p>
-          )}
-        </div>
-      )}
-
-      {myAvailabilities.length === 0 && !loading && (
-        <p className="text-sm text-muted-foreground text-center py-2">
-          Vous n'avez pas de disponibilité enregistrée
+      {/* Upcoming availabilities by person */}
+      <div className="space-y-3 max-h-64 overflow-y-auto">
+        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <Users className="w-3 h-3" />
+          Prochaines disponibilités par personne :
         </p>
-      )}
+        
+        {Object.entries(upcomingByUser()).map(([userId, availabilities]) => {
+          const isMe = userId === user?.id;
+          const name = isMe ? 'Vous' : (profileNames[userId] || 'Chargement...');
+          const sortedAvails = availabilities.sort((a, b) => a.date.localeCompare(b.date));
+          
+          return (
+            <div 
+              key={userId}
+              className={cn(
+                "rounded-lg p-3 border",
+                isMe ? "bg-success/5 border-success/20" : "bg-secondary/30 border-border"
+              )}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
+                  isMe ? "bg-success/20 text-success" : "bg-primary/20 text-primary"
+                )}>
+                  <User className="w-3 h-3" />
+                </div>
+                <span className="font-medium text-sm text-foreground">{name}</span>
+                <span className="text-xs text-muted-foreground">
+                  ({sortedAvails.length} jour{sortedAvails.length > 1 ? 's' : ''})
+                </span>
+              </div>
+              
+              <div className="flex flex-wrap gap-1.5">
+                {sortedAvails.slice(0, 7).map((avail) => (
+                  <div 
+                    key={avail.id}
+                    className={cn(
+                      "text-[10px] px-2 py-1 rounded-full flex items-center gap-1",
+                      isMe ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
+                    )}
+                  >
+                    <span>{format(parseISO(avail.date), 'd MMM', { locale: fr })}</span>
+                    {isMe && (
+                      <button 
+                        onClick={() => handleDeleteAvailability(avail.id)}
+                        className="hover:text-destructive ml-0.5"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {sortedAvails.length > 7 && (
+                  <span className="text-[10px] px-2 py-1 text-muted-foreground">
+                    +{sortedAvails.length - 7}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {Object.keys(upcomingByUser()).length === 0 && !loading && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Aucune disponibilité enregistrée
+          </p>
+        )}
+      </div>
 
       {/* Add Availability Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -355,7 +462,7 @@ export const AvailabilityCalendar = () => {
             </div>
 
             {dateRange.from && (
-              <div className="text-sm text-center text-foreground">
+              <div className="text-sm text-center text-foreground bg-primary/5 rounded-lg p-3">
                 {dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime() ? (
                   <>
                     Du <strong>{format(dateRange.from, 'd MMMM', { locale: fr })}</strong> au{' '}
@@ -394,44 +501,67 @@ export const AvailabilityCalendar = () => {
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
               {selectedDate && format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr })}
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Personnes disponibles :</p>
-            {selectedDate && getAvailabilitiesForDate(selectedDate).map((availability) => {
-              const isMe = availability.user_id === user?.id;
-              const name = profileNames[availability.user_id] || 'Chargement...';
-              
-              return (
-                <div 
-                  key={availability.id}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2",
-                    isMe ? "bg-success/10" : "bg-secondary/50"
-                  )}
-                >
-                  <span className="text-sm text-foreground">
-                    {isMe ? 'Vous' : name}
-                  </span>
-                  {isMe && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        handleDeleteAvailability(availability.id);
-                        setDetailDialogOpen(false);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span>
+                {selectedDate && getAvailabilitiesForDate(selectedDate).length} personne(s) disponible(s)
+              </span>
+            </div>
+            
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {selectedDate && getAvailabilitiesForDate(selectedDate).map((availability) => {
+                const isMe = availability.user_id === user?.id;
+                const name = profileNames[availability.user_id] || 'Chargement...';
+                
+                return (
+                  <div 
+                    key={availability.id}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-4 py-3 border",
+                      isMe ? "bg-success/5 border-success/20" : "bg-secondary/30 border-border"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center",
+                        isMe ? "bg-success/20 text-success" : "bg-primary/20 text-primary"
+                      )}>
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-foreground block">
+                          {isMe ? 'Vous' : name}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatTime(availability.start_time)} - {formatTime(availability.end_time)}
+                        </span>
+                      </div>
+                    </div>
+                    {isMe && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          handleDeleteAvailability(availability.id);
+                          setDetailDialogOpen(false);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
