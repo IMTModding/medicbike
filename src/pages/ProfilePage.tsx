@@ -2,17 +2,25 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { z } from 'zod';
+
+const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères');
 
 const ProfilePage = () => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   
   const { user, loading: authLoading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
@@ -68,6 +76,43 @@ const ProfilePage = () => {
       toast.error('Erreur lors de la mise à jour');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    // Validate new password
+    try {
+      passwordSchema.parse(newPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast.error(err.errors[0].message);
+        return;
+      }
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Mot de passe mis à jour avec succès');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (error) {
+      toast.error('Erreur lors du changement de mot de passe');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -167,6 +212,65 @@ const ProfilePage = () => {
               <Save className="w-4 h-4" />
             )}
             Enregistrer
+          </Button>
+        </div>
+
+        {/* Change Password */}
+        <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+          <h3 className="font-medium text-foreground flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Changer le mot de passe
+          </h3>
+          
+          <div className="relative">
+            <Label htmlFor="newPassword" className="mb-1.5 block text-sm">
+              Nouveau mot de passe
+            </Label>
+            <div className="relative">
+              <Input
+                id="newPassword"
+                type={showPasswords ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min. 6 caractères"
+                className="bg-secondary pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPasswords(!showPasswords)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="confirmPassword" className="mb-1.5 block text-sm">
+              Confirmer le mot de passe
+            </Label>
+            <Input
+              id="confirmPassword"
+              type={showPasswords ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Répétez le mot de passe"
+              className="bg-secondary"
+            />
+          </div>
+
+          <Button 
+            onClick={handleChangePassword}
+            disabled={changingPassword || !newPassword || !confirmPassword}
+            variant="secondary"
+            className="w-full gap-2"
+          >
+            {changingPassword ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Lock className="w-4 h-4" />
+            )}
+            Mettre à jour le mot de passe
           </Button>
         </div>
 
