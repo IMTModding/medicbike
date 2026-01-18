@@ -6,6 +6,7 @@ import { CreateAlertDialog } from '@/components/CreateAlertDialog';
 import Onboarding from '@/components/Onboarding';
 import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
+import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useOfflineMode } from '@/hooks/useOfflineMode';
@@ -171,7 +172,9 @@ const Index = () => {
           </div>
         )}
 
-        {/* Stats */}
+        {/* Availability Calendar */}
+        <AvailabilityCalendar />
+
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-card rounded-xl p-3 border border-border">
             <div className="flex items-center gap-2 mb-1">
