@@ -25,14 +25,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<UserRole | null>(null);
 
   const fetchUserRole = async (userId: string) => {
-    const { data } = await supabase
+    console.log('Fetching role for user:', userId);
+    const { data, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
       .maybeSingle();
     
+    console.log('Role fetch result:', { data, error });
+    
     if (data) {
+      console.log('Setting role to:', data.role);
       setRole(data.role as UserRole);
+    } else {
+      console.log('No role found for user');
     }
   };
 
