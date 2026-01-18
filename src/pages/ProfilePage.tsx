@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,14 +14,16 @@ const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins
 
 const ProfilePage = () => {
   const [fullName, setFullName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading: authLoading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -38,13 +40,14 @@ const ProfilePage = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, avatar_url')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (error) throw error;
         if (data) {
           setFullName(data.full_name || '');
+          setAvatarUrl(data.avatar_url || null);
         }
       } catch (error) {
         console.error('Error loading profile:', error);
@@ -57,6 +60,57 @@ const ProfilePage = () => {
       loadProfile();
     }
   }, [user]);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Veuillez sélectionner une image');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('L\'image ne doit pas dépasser 2 Mo');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl + '?t=' + Date.now()); // Add cache buster
+      toast.success('Photo de profil mise à jour');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Erreur lors du téléchargement');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -156,11 +210,44 @@ const ProfilePage = () => {
       <main className="container px-4 py-6 space-y-6">
         {/* Avatar */}
         <div className="flex flex-col items-center py-6">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-warning flex items-center justify-center mb-4">
-            <User className="w-12 h-12 text-white" />
+          <div className="relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarChange}
+              accept="image/*"
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="relative w-24 h-24 rounded-full overflow-hidden group"
+            >
+              {avatarUrl ? (
+                <img 
+                  src={avatarUrl} 
+                  alt="Photo de profil" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary to-warning flex items-center justify-center">
+                  <User className="w-12 h-12 text-white" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-white" />
+                )}
+              </div>
+            </button>
           </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Cliquez pour changer
+          </p>
           <div className={cn(
-            "text-xs font-medium px-3 py-1 rounded-full",
+            "text-xs font-medium px-3 py-1 rounded-full mt-2",
             isAdmin 
               ? "bg-primary/20 text-primary" 
               : "bg-secondary text-muted-foreground"
