@@ -1,11 +1,123 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import webpush from "https://esm.sh/web-push@3.6.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Convert URL-safe base64 to Uint8Array
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Convert Uint8Array to URL-safe base64
+function uint8ArrayToUrlBase64(uint8Array: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Import raw key for ECDSA signing
+async function importVapidKey(privateKeyBase64: string): Promise<CryptoKey> {
+  const privateKeyBytes = urlBase64ToUint8Array(privateKeyBase64);
+  
+  // Build PKCS#8 format from raw key
+  const pkcs8Header = new Uint8Array([
+    0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 
+    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 
+    0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 
+    0x03, 0x01, 0x07, 0x04, 0x6d, 0x30, 0x6b, 0x02, 
+    0x01, 0x01, 0x04, 0x20
+  ]);
+  
+  const pkcs8Footer = new Uint8Array([
+    0xa1, 0x44, 0x03, 0x42, 0x00
+  ]);
+  
+  const pkcs8Key = new Uint8Array(pkcs8Header.length + privateKeyBytes.length + pkcs8Footer.length + 65);
+  pkcs8Key.set(pkcs8Header);
+  pkcs8Key.set(privateKeyBytes, pkcs8Header.length);
+  
+  return await crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8Key,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+}
+
+// Create JWT for VAPID authentication
+async function createVapidJwt(
+  audience: string,
+  subject: string,
+  publicKey: string,
+  privateKey: string
+): Promise<string> {
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: now + 12 * 60 * 60,
+    sub: subject,
+  };
+
+  const headerB64 = uint8ArrayToUrlBase64(new TextEncoder().encode(JSON.stringify(header)));
+  const payloadB64 = uint8ArrayToUrlBase64(new TextEncoder().encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  try {
+    const key = await importVapidKey(privateKey);
+    const signature = await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      new TextEncoder().encode(unsignedToken)
+    );
+    const signatureB64 = uint8ArrayToUrlBase64(new Uint8Array(signature));
+    return `${unsignedToken}.${signatureB64}`;
+  } catch (error) {
+    console.error('Error creating JWT:', error);
+    throw error;
+  }
+}
+
+// Send a single push notification using fetch
+async function sendPushNotification(
+  subscription: { endpoint: string; p256dh: string; auth: string },
+  payload: string,
+  vapidPublicKey: string,
+  vapidPrivateKey: string,
+  subject: string
+): Promise<Response> {
+  const endpoint = new URL(subscription.endpoint);
+  const audience = `${endpoint.protocol}//${endpoint.host}`;
+  
+  const jwt = await createVapidJwt(audience, subject, vapidPublicKey, vapidPrivateKey);
+  
+  const response = await fetch(subscription.endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Encoding': 'aes128gcm',
+      'TTL': '86400',
+      'Authorization': `vapid t=${jwt}, k=${vapidPublicKey}`,
+      'Urgency': 'high',
+    },
+    body: payload,
+  });
+  
+  return response;
+}
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -27,13 +139,6 @@ serve(async (req) => {
       );
     }
 
-    // Configure web-push with VAPID details
-    webpush.setVapidDetails(
-      'mailto:contact@medicbike.lovable.app',
-      vapidPublicKey,
-      vapidPrivateKey
-    );
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const body = await req.json();
@@ -46,7 +151,6 @@ serve(async (req) => {
       organizationId, 
       excludeUserId, 
       newsId,
-      // For webhook trigger - already has senderUserId
       senderUserId: providedSenderUserId
     } = body;
     
@@ -80,7 +184,6 @@ serve(async (req) => {
     let userIdsToNotify: string[] = [];
     
     if (type === 'news' && senderUserId) {
-      // For news notifications, notify all users in the admin's organization
       const { data: inviteCode } = await supabase
         .from('invite_codes')
         .select('id')
@@ -97,7 +200,6 @@ serve(async (req) => {
         console.log('News - Users to notify:', userIdsToNotify.length);
       }
     } else if (type === 'chat' && organizationId) {
-      // For chat notifications, notify users in the same organization
       const { data: orgProfiles } = await supabase
         .from('profiles')
         .select('user_id')
@@ -108,7 +210,6 @@ serve(async (req) => {
         .filter(id => id !== excludeUserId);
         
     } else if (senderUserId) {
-      // For intervention alerts, get the sender's organization and notify all members
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('invite_code_id, admin_id')
@@ -118,7 +219,6 @@ serve(async (req) => {
       console.log('Sender profile:', senderProfile);
       
       if (senderProfile) {
-        // Check if sender is an admin
         const { data: adminCheck } = await supabase
           .from('user_roles')
           .select('role')
@@ -129,7 +229,6 @@ serve(async (req) => {
         let orgId: string | null = null;
         
         if (adminCheck) {
-          // Sender is admin - get their invite code ID
           const { data: inviteCode } = await supabase
             .from('invite_codes')
             .select('id')
@@ -139,19 +238,16 @@ serve(async (req) => {
           orgId = inviteCode?.id || null;
           console.log('Admin org ID:', orgId);
         } else {
-          // Sender is employee - use their invite_code_id
           orgId = senderProfile.invite_code_id;
           console.log('Employee org ID:', orgId);
         }
         
         if (orgId) {
-          // Get all users in this organization (employees + admin)
           const { data: orgMembers } = await supabase
             .from('profiles')
             .select('user_id')
             .eq('invite_code_id', orgId);
           
-          // Also get the admin
           const { data: adminProfile } = await supabase
             .from('invite_codes')
             .select('admin_id')
@@ -163,7 +259,6 @@ serve(async (req) => {
             memberIds.push(adminProfile.admin_id);
           }
           
-          // Exclude the sender
           userIdsToNotify = [...new Set(memberIds)].filter(id => id !== senderUserId);
           console.log('Users to notify:', userIdsToNotify.length);
         }
@@ -178,7 +273,6 @@ serve(async (req) => {
       );
     }
 
-    // Get push subscriptions for these users
     const { data: subscriptions, error: subError } = await supabase
       .from('push_subscriptions')
       .select('*')
@@ -219,36 +313,40 @@ serve(async (req) => {
       },
     });
 
-    // Send to all subscriptions using web-push
+    // Send to all subscriptions
     const results = await Promise.allSettled(
       (subscriptions || []).map(async (sub) => {
         try {
           console.log('Sending to endpoint:', sub.endpoint.substring(0, 60));
           
-          const pushSubscription = {
-            endpoint: sub.endpoint,
-            keys: {
-              p256dh: sub.p256dh,
-              auth: sub.auth,
-            },
-          };
-
-          await webpush.sendNotification(pushSubscription, payload);
-          console.log('Push sent successfully to user:', sub.user_id);
-          return { success: true, userId: sub.user_id };
-        } catch (err: unknown) {
-          const error = err as Error & { statusCode?: number };
-          console.error('Push error for subscription:', error.message);
+          const response = await sendPushNotification(
+            { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+            payload,
+            vapidPublicKey,
+            vapidPrivateKey,
+            'mailto:contact@medicbike.lovable.app'
+          );
           
-          // If subscription is invalid (expired or unsubscribed), delete it
-          if (error.statusCode === 404 || error.statusCode === 410) {
-            console.log('Removing invalid subscription:', sub.id);
-            await supabase
-              .from('push_subscriptions')
-              .delete()
-              .eq('id', sub.id);
+          if (response.ok || response.status === 201) {
+            console.log('Push sent successfully to user:', sub.user_id);
+            return { success: true, userId: sub.user_id };
+          } else {
+            console.error('Push failed with status:', response.status);
+            
+            // If subscription is invalid, delete it
+            if (response.status === 404 || response.status === 410) {
+              console.log('Removing invalid subscription:', sub.id);
+              await supabase
+                .from('push_subscriptions')
+                .delete()
+                .eq('id', sub.id);
+            }
+            
+            return { success: false, status: response.status };
           }
-          
+        } catch (err: unknown) {
+          const error = err as Error;
+          console.error('Push error for subscription:', error.message);
           return { success: false, error: error.message };
         }
       })
