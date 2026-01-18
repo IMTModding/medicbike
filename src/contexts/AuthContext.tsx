@@ -91,8 +91,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         if (!isMounted) return;
         window.clearTimeout(timeoutId);
-        // Don't overwrite the timeout/offline message if it already displayed
-        setInitError((prev) => prev ?? "Erreur lors de l'initialisation. Réessayez.");
+        // Keep a single, consistent message for all init failures
+        setInitError((prev) =>
+          prev ??
+          "Impossible de se connecter au service. Vérifiez votre connexion internet puis réessayez."
+        );
       } finally {
         if (!isMounted) return;
         setLoading(false);
