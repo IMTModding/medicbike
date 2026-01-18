@@ -1,10 +1,7 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  fetchHistoryInterventions, 
-  InterventionWithResponses 
-} from '@/services/interventions';
+import { useHistoryInterventions } from '@/hooks/useInterventions';
 import { 
   ArrowLeft, 
   CheckCircle2, 
@@ -20,7 +17,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -60,32 +56,23 @@ const getUrgencyConfig = (urgency: string) => {
 };
 
 const HistoryPage = () => {
-  const [interventions, setInterventions] = useState<InterventionWithResponses[]>([]);
-  const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+  const [appliedStartDate, setAppliedStartDate] = useState('');
+  const [appliedEndDate, setAppliedEndDate] = useState('');
   
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const start = startDate ? new Date(startDate) : undefined;
-      const end = endDate ? new Date(endDate) : undefined;
-      
-      const data = await fetchHistoryInterventions(start, end);
-      setInterventions(data);
-    } catch (error) {
-      console.error('Error loading history:', error);
-      toast.error('Erreur lors du chargement');
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate]);
+  // React Query with caching
+  const { 
+    data: interventions = [], 
+    isLoading: loading,
+    refetch,
+  } = useHistoryInterventions(appliedStartDate, appliedEndDate);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -93,20 +80,17 @@ const HistoryPage = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user, loadData]);
-
   const handleApplyFilters = () => {
-    loadData();
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
     setShowFilters(false);
   };
 
   const handleClearFilters = () => {
     setStartDate('');
     setEndDate('');
+    setAppliedStartDate('');
+    setAppliedEndDate('');
     setSearchQuery('');
     setUrgencyFilter('all');
   };
@@ -128,7 +112,7 @@ const HistoryPage = () => {
     });
   }, [interventions, searchQuery, urgencyFilter]);
 
-  const hasActiveFilters = searchQuery || urgencyFilter !== 'all' || startDate || endDate;
+  const hasActiveFilters = searchQuery || urgencyFilter !== 'all' || appliedStartDate || appliedEndDate;
 
   if (authLoading) {
     return (
@@ -139,7 +123,7 @@ const HistoryPage = () => {
   }
 
   // Show skeleton while loading data
-  if (loading && user) {
+  if (loading && user && interventions.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -186,7 +170,7 @@ const HistoryPage = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <ExportHistoryDialog startDate={startDate} endDate={endDate} />
+            <ExportHistoryDialog startDate={appliedStartDate} endDate={appliedEndDate} />
             <Button
               variant="secondary"
               size="icon"
@@ -305,10 +289,10 @@ const HistoryPage = () => {
                 </p>
               </div>
             </div>
-            {(startDate || endDate) && (
+            {(appliedStartDate || appliedEndDate) && (
               <div className="text-right text-sm text-muted-foreground">
-                {startDate && <p>Du {format(new Date(startDate), 'dd/MM/yyyy')}</p>}
-                {endDate && <p>Au {format(new Date(endDate), 'dd/MM/yyyy')}</p>}
+                {appliedStartDate && <p>Du {format(new Date(appliedStartDate), 'dd/MM/yyyy')}</p>}
+                {appliedEndDate && <p>Au {format(new Date(appliedEndDate), 'dd/MM/yyyy')}</p>}
               </div>
             )}
           </div>
@@ -426,7 +410,7 @@ const HistoryPage = () => {
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
               {interventions.length === 0
-                ? (startDate || endDate 
+                ? (appliedStartDate || appliedEndDate 
                     ? 'Aucune intervention terminée pour cette période'
                     : 'Aucune intervention terminée pour le moment')
                 : 'Aucune intervention ne correspond à vos critères de recherche'}
