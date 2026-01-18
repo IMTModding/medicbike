@@ -248,18 +248,6 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     (v) => !assignments.some((a) => a.vehicleId === v.id)
   );
 
-  // UX: if there's only one choice, preselect it so the "+" button is clickable
-  useEffect(() => {
-    if (!open) return;
-
-    if (!selectedEmployee && availableEmployees.length === 1) {
-      setSelectedEmployee(availableEmployees[0].user_id);
-    }
-    if (!selectedVehicle && availableVehicles.length === 1) {
-      setSelectedVehicle(availableVehicles[0].id);
-    }
-  }, [open, selectedEmployee, selectedVehicle, availableEmployees, availableVehicles]);
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
