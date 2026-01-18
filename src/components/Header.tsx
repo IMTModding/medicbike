@@ -43,64 +43,65 @@ export const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-      <div className="container flex items-center justify-between h-16 px-4">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="MEDICBIKE Logo" className="w-10 h-10 rounded-full object-cover" />
-          <div>
-            <h1 className="font-bold text-lg text-foreground whitespace-nowrap">MEDICBIKE</h1>
-            <p className="text-xs text-muted-foreground">
-              {isAdmin ? 'Administrateur' : 'Alertes en cours'}
+      <div className="container flex items-center justify-between h-16 px-4 gap-2">
+        {/* Logo and title - fixed width */}
+        <div className="flex items-center gap-2 shrink-0">
+          <img src={logo} alt="MEDICBIKE Logo" className="w-9 h-9 rounded-full object-cover" />
+          <div className="hidden xs:block">
+            <h1 className="font-bold text-base text-foreground leading-tight">MEDICBIKE</h1>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              {isAdmin ? 'Admin' : 'Alertes'}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-1">
+        {/* Navigation buttons - scrollable on small screens */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
           <NotificationToggle />
           
-          {/* Quick access buttons */}
           <button 
             onClick={() => navigate('/news')}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Actualités"
           >
-            <Newspaper className="w-5 h-5 text-foreground" />
+            <Newspaper className="w-4 h-4 text-foreground" />
           </button>
           
           <button 
             onClick={() => navigate('/general-chat')}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Chat général"
           >
-            <MessageCircle className="w-5 h-5 text-foreground" />
+            <MessageCircle className="w-4 h-4 text-foreground" />
           </button>
           
           <button 
             onClick={() => navigate('/map')}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Carte"
           >
-            <MapPin className="w-5 h-5 text-foreground" />
+            <MapPin className="w-4 h-4 text-foreground" />
           </button>
           
           <button 
             onClick={() => navigate('/stats')}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent shrink-0"
             title="Statistiques"
           >
-            <BarChart3 className="w-5 h-5 text-foreground" />
+            <BarChart3 className="w-4 h-4 text-foreground" />
           </button>
 
           {/* Menu dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button 
-                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent overflow-hidden"
+                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center transition-colors hover:bg-accent overflow-hidden shrink-0"
                 title="Menu"
               >
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-5 h-5 text-foreground" />
+                  <User className="w-4 h-4 text-foreground" />
                 )}
               </button>
             </DropdownMenuTrigger>
