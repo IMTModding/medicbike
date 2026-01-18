@@ -39,17 +39,29 @@ const ProfilePage = () => {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name, avatar_url, phone')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const [profileRes, contactsRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('profile_contacts')
+            .select('phone')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+        ]);
 
-        if (error) throw error;
-        if (data) {
-          setFullName(data.full_name || '');
-          setPhone(data.phone || '');
-          setAvatarUrl(data.avatar_url || null);
+        if (profileRes.error) throw profileRes.error;
+        // contacts row might not exist yet (PGRST116 = no rows)
+        if (contactsRes.error && contactsRes.error.code !== 'PGRST116') throw contactsRes.error;
+
+        if (profileRes.data) {
+          setFullName(profileRes.data.full_name || '');
+          setAvatarUrl(profileRes.data.avatar_url || null);
+        }
+        if (contactsRes.data) {
+          setPhone(contactsRes.data.phone || '');
         }
       } catch (error) {
         console.error('Error loading profile:', error);
