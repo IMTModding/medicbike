@@ -48,6 +48,11 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
 
+    /* Admin accent (violet) */
+    --admin: 270 90% 62%;
+    --admin-strong: 270 92% 52%;
+    --admin-foreground: 0 0% 100%;
+
     --urgent: 0 84% 60%;
     --urgent-foreground: 0 0% 100%;
 
