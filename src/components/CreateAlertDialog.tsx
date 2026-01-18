@@ -242,11 +242,23 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
 
   // Filter out already assigned employees and vehicles
   const availableEmployees = employees.filter(
-    e => !assignments.some(a => a.userId === e.user_id)
+    (e) => !assignments.some((a) => a.userId === e.user_id)
   );
   const availableVehicles = vehicles.filter(
-    v => !assignments.some(a => a.vehicleId === v.id)
+    (v) => !assignments.some((a) => a.vehicleId === v.id)
   );
+
+  // UX: if there's only one choice, preselect it so the "+" button is clickable
+  useEffect(() => {
+    if (!open) return;
+
+    if (!selectedEmployee && availableEmployees.length === 1) {
+      setSelectedEmployee(availableEmployees[0].user_id);
+    }
+    if (!selectedVehicle && availableVehicles.length === 1) {
+      setSelectedVehicle(availableVehicles[0].id);
+    }
+  }, [open, selectedEmployee, selectedVehicle, availableEmployees, availableVehicles]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
