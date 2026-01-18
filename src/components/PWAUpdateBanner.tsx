@@ -1,18 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const PWAUpdateBanner = () => {
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const updateRequestedRef = useRef(false);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    let registration: ServiceWorkerRegistration | null = null;
+    let onUpdateFound: (() => void) | null = null;
+
+    const onControllerChange = () => {
+      // Reload ONLY when the user explicitly requested an update.
+      if (updateRequestedRef.current) {
+        window.location.reload();
+      }
+    };
+
     const checkForUpdates = async () => {
       try {
-        const registration = await navigator.serviceWorker.getRegistration();
-        
+        registration = await navigator.serviceWorker.getRegistration();
+
         if (registration) {
           // Check if there's already a waiting worker
           if (registration.waiting) {
@@ -21,8 +32,8 @@ export const PWAUpdateBanner = () => {
           }
 
           // Listen for new updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
+          onUpdateFound = () => {
+            const newWorker = registration?.installing;
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -31,13 +42,12 @@ export const PWAUpdateBanner = () => {
                 }
               });
             }
-          });
+          };
+
+          registration.addEventListener('updatefound', onUpdateFound);
         }
 
-        // Listen for controller change (when update is activated)
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
-        });
+        navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
       } catch (error) {
         console.error('Error checking for SW updates:', error);
       }
@@ -46,20 +56,26 @@ export const PWAUpdateBanner = () => {
     checkForUpdates();
 
     // Check for updates periodically (every 30 minutes)
-    const interval = setInterval(() => {
-      navigator.serviceWorker.getRegistration().then(reg => {
+    const interval = window.setInterval(() => {
+      navigator.serviceWorker.getRegistration().then((reg) => {
         reg?.update();
       });
     }, 30 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      if (registration && onUpdateFound) {
+        registration.removeEventListener('updatefound', onUpdateFound);
+      }
+    };
   }, []);
 
   const handleUpdate = () => {
+    updateRequestedRef.current = true;
     if (waitingWorker) {
       waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     } else {
-      // Fallback: force reload
       window.location.reload();
     }
   };

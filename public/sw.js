@@ -5,7 +5,8 @@
 // - Handle push notifications
 
 self.addEventListener("install", function () {
-  self.skipWaiting();
+  // Don't force activate immediately; we let the app trigger it via SKIP_WAITING.
+  // This avoids update/reload loops on some mobile browsers.
 });
 
 self.addEventListener("activate", function (event) {
