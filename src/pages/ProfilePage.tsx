@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins
 
 const ProfilePage = () => {
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,13 +41,14 @@ const ProfilePage = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name, avatar_url')
+          .select('full_name, avatar_url, phone')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (error) throw error;
         if (data) {
           setFullName(data.full_name || '');
+          setPhone(data.phone || '');
           setAvatarUrl(data.avatar_url || null);
         }
       } catch (error) {
@@ -119,7 +121,7 @@ const ProfilePage = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: fullName })
+        .update({ full_name: fullName, phone: phone })
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -286,6 +288,20 @@ const ProfilePage = () => {
             <p className="text-xs text-muted-foreground mt-1">
               L'email ne peut pas être modifié
             </p>
+          </div>
+
+          <div>
+            <Label className="flex items-center gap-2 mb-1.5">
+              <Phone className="w-4 h-4" />
+              Téléphone
+            </Label>
+            <Input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="06 12 34 56 78"
+              className="bg-secondary"
+            />
           </div>
 
           <Button 
