@@ -82,7 +82,8 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
       .rpc('get_organization_profiles', { p_user_id: user.id });
     
     if (profilesData) {
-      setEmployees(profilesData.filter((p: Profile) => p.user_id !== user.id));
+      // Include all employees (including current user for self-assignment)
+      setEmployees(profilesData);
     }
   };
 
@@ -448,7 +449,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 )}
 
                 {/* Add new assignment */}
-                {availableEmployees.length > 0 && availableVehicles.length > 0 && (
+                {vehicles.length > 0 && employees.length > 0 ? (
                   <div className="flex gap-2">
                     <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                       <SelectTrigger className="flex-1 bg-secondary border-border">
@@ -487,11 +488,13 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
-                )}
-
-                {vehicles.length === 0 && (
+                ) : vehicles.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">
                     Aucune moto configurée. Ajoutez des motos dans les paramètres.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    Aucun employé disponible.
                   </p>
                 )}
               </div>
