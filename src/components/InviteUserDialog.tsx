@@ -90,6 +90,8 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
         },
       });
 
+      console.log('[InviteUserDialog] invite-user response:', response);
+
       // Check for error in response data first (custom error messages from edge function)
       if (response.data?.error) {
         throw new Error(response.data.error);
@@ -97,16 +99,17 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
 
       // Then check for generic function invoke error
       if (response.error) {
-        // Try to parse the error context for a more specific message
-        const errorMessage = response.error.message || 'Erreur lors de l\'invitation';
+        const errorMessage = response.error.message || "Erreur lors de l'invitation";
         throw new Error(errorMessage);
       }
 
-      // If tempPassword is returned (email not configured), show it
+      // If tempPassword is returned (email not configured / email failed), show it
       if (response.data?.tempPassword) {
         setTempPassword(response.data.tempPassword);
-        toast.success('Utilisateur créé ! Notez le mot de passe temporaire.');
+        toast.success('Utilisateur créé ! Copiez les identifiants ci-dessous.');
       } else {
+        // If we get here, the backend didn't provide a temp password.
+        // In that case we cannot show credentials, so keep the dialog open and show a clear message.
         toast.success('Invitation envoyée par email !');
         resetForm();
         setOpen(false);
@@ -157,7 +160,16 @@ const InviteUserDialog = ({ onUserInvited }: InviteUserDialogProps) => {
           Inviter un utilisateur
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onInteractOutside={(e) => {
+          // Avoid closing the dialog while we are loading or while displaying temp credentials
+          if (loading || tempPassword) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (loading || tempPassword) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-5 h-5" />
