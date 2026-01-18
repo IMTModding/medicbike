@@ -68,26 +68,43 @@ export const AvailabilityCalendar = () => {
       const startDate = startOfDay(dateRange.from);
       const endDate = dateRange.to ? startOfDay(dateRange.to) : startDate;
       
-      // Create entries for each day in the range
+      // Get existing availabilities for the date range
+      const { data: existing } = await supabase
+        .from('availabilities')
+        .select('date')
+        .eq('user_id', user.id)
+        .gte('date', format(startDate, 'yyyy-MM-dd'))
+        .lte('date', format(endDate, 'yyyy-MM-dd'));
+
+      const existingDates = new Set(existing?.map(e => e.date) || []);
+
+      // Create entries for each day in the range (skip existing)
       const entries = [];
       let currentDate = startDate;
       
       while (currentDate <= endDate) {
-        entries.push({
-          user_id: user.id,
-          date: format(currentDate, 'yyyy-MM-dd'),
-          start_time: '08:00',
-          end_time: '18:00'
-        });
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        if (!existingDates.has(dateStr)) {
+          entries.push({
+            user_id: user.id,
+            date: dateStr,
+            start_time: '08:00',
+            end_time: '18:00'
+          });
+        }
         currentDate = addDays(currentDate, 1);
+      }
+
+      if (entries.length === 0) {
+        toast.info('Ces dates sont déjà enregistrées');
+        setDialogOpen(false);
+        setDateRange({ from: undefined, to: undefined });
+        return;
       }
 
       const { error } = await supabase
         .from('availabilities')
-        .upsert(entries, { 
-          onConflict: 'user_id,date',
-          ignoreDuplicates: true 
-        });
+        .insert(entries);
 
       if (error) throw error;
 
@@ -100,7 +117,7 @@ export const AvailabilityCalendar = () => {
       loadAvailabilities();
     } catch (error: any) {
       console.error('Error adding availability:', error);
-      toast.error("Erreur lors de l'ajout");
+      toast.error("Erreur lors de l'ajout: " + (error.message || error.code || 'Erreur inconnue'));
     } finally {
       setSaving(false);
     }
