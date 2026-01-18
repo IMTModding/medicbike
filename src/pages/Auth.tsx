@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo.jpg';
+import { resetPWAAndReload } from '@/lib/pwaReset';
 
 const emailSchema = z.string().email('Email invalide');
 const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères');
@@ -161,6 +162,21 @@ const Auth = () => {
           <h1 className="font-bold text-2xl text-foreground">MEDICBIKE</h1>
           <p className="text-sm text-muted-foreground">Unité Médicale Motocycliste</p>
         </div>
+      </div>
+
+      {/* Reset PWA (helps when an old cached version blocks the app) */}
+      <div className="w-full max-w-sm mb-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => resetPWAAndReload()}
+        >
+          Réinitialiser l’application
+        </Button>
+        <p className="mt-2 text-xs text-muted-foreground text-center">
+          Si la PWA est bloquée, cela vide le cache et redémarre.
+        </p>
       </div>
 
       {/* Forgot Password Form */}
