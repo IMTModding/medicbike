@@ -91,15 +91,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.error("Error creating user:", createError);
       
       if (createError.message.includes("already been registered")) {
+        // Return 200 with error in body so frontend can read it
         return new Response(
-          JSON.stringify({ error: "Cet email est déjà enregistré" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: "Cet email est déjà enregistré dans le système" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
       return new Response(
-        JSON.stringify({ error: createError.message }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: createError.message }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
