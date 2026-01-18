@@ -17,8 +17,7 @@ export default defineConfig(({ mode }) => ({
     react(), 
     mode === "development" && componentTagger(),
     VitePWA({
-      // IMPORTANT: we use a single SW source (public/sw.js) to avoid conflicts
-      // between a generated SW and our push-notification SW.
+      // Use our own sw.js without Workbox precache injection.
       strategies: "injectManifest",
       srcDir: "public",
       filename: "sw.js",
@@ -54,8 +53,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"]
-      }
+        // Disable the automatic manifest injection since our SW doesn't use precaching
+        injectionPoint: undefined,
+      },
     })
   ].filter(Boolean),
   resolve: {
