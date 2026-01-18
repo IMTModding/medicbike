@@ -28,7 +28,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [latestNews, setLatestNews] = useState<NewsItem[]>([]);
   
-  const { user, loading: authLoading, role } = useAuth();
+  const { user, loading: authLoading, role, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const loadInterventions = useCallback(async () => {
@@ -257,7 +257,7 @@ const Index = () => {
       </main>
 
       {/* Admin: Create Alert Button */}
-      {role === 'admin' && (
+      {isAdmin && (
         <CreateAlertDialog onCreated={loadInterventions} />
       )}
     </div>
