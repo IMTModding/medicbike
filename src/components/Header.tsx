@@ -47,8 +47,8 @@ export const Header = () => {
         {/* Logo and title - fixed width */}
         <div className="flex items-center gap-2 shrink-0">
           <img src={logo} alt="MEDICBIKE Logo" className="w-9 h-9 rounded-full object-cover" />
-          <div className="hidden xs:block">
-            <h1 className="font-bold text-base text-foreground leading-tight">MEDICBIKE</h1>
+          <div>
+            <h1 className="font-bold text-sm sm:text-base text-foreground leading-tight">MEDICBIKE</h1>
             <p className="text-[10px] text-muted-foreground leading-tight">
               {isAdmin ? 'Admin' : 'Alertes'}
             </p>
