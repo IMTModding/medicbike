@@ -192,8 +192,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isAdmin = role === 'admin';
 
+  const allowRenderWhileLoading =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/auth') ||
+      window.location.pathname.startsWith('/reset-password'));
+
   // If auth initialization failed (timeout/offline), show a clear retry screen
-  if (initError) {
+  if (initError && !allowRenderWhileLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 p-6">
         <div className="flex flex-col items-center gap-3">
@@ -223,13 +228,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   // Block rendering until auth is initialized to prevent infinite loops
-  if (loading) {
+  // Exception: allow /auth and /reset-password to render so users can still log in.
+  if (loading && !allowRenderWhileLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6">
         <div className="relative">
-          <img 
-            src={logo} 
-            alt="MEDICBIKE" 
+          <img
+            src={logo}
+            alt="MEDICBIKE"
             className="w-24 h-24 rounded-full object-cover shadow-lg animate-pulse"
           />
           <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" />
