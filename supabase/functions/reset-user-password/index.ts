@@ -25,28 +25,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Create admin client
-    const supabaseAdmin = createClient(
+    // Create a client with user's token for verification
+    const supabaseWithAuth = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify the requester is an admin
+    // Verify the token using getClaims
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const { data: claimsData, error: claimsError } = await supabaseWithAuth.auth.getClaims(token);
     
-    if (userError || !userData.user) {
+    if (claimsError || !claimsData?.claims) {
+      console.error("Invalid token:", claimsError);
       return new Response(
         JSON.stringify({ error: "Token invalide" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const requesterId = claimsData.claims.sub as string;
+
+    // Create admin client for privileged operations
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     // Check if user is admin
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", requesterId)
       .single();
 
     if (roleError || roleData?.role !== "admin") {
@@ -83,10 +93,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { data: adminCodes } = await supabaseAdmin
       .from("invite_codes")
       .select("id")
-      .eq("admin_id", userData.user.id);
+      .eq("admin_id", requesterId);
 
     const adminCodeIds = (adminCodes || []).map(c => c.id);
-    const belongsToAdmin = targetProfile.admin_id === userData.user.id || 
+    const belongsToAdmin = targetProfile.admin_id === requesterId || 
                           (targetProfile.invite_code_id && adminCodeIds.includes(targetProfile.invite_code_id));
 
     if (!belongsToAdmin) {
