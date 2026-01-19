@@ -27,30 +27,39 @@ function uint8ArrayToUrlBase64(uint8Array: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Import raw key for ECDSA signing
-async function importVapidKey(privateKeyBase64: string): Promise<CryptoKey> {
-  const privateKeyBytes = urlBase64ToUint8Array(privateKeyBase64);
-  
-  // Build PKCS#8 format from raw key
-  const pkcs8Header = new Uint8Array([
-    0x30, 0x81, 0x87, 0x02, 0x01, 0x00, 0x30, 0x13, 
-    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 
-    0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 
-    0x03, 0x01, 0x07, 0x04, 0x6d, 0x30, 0x6b, 0x02, 
-    0x01, 0x01, 0x04, 0x20
-  ]);
-  
-  const pkcs8Footer = new Uint8Array([
-    0xa1, 0x44, 0x03, 0x42, 0x00
-  ]);
-  
-  const pkcs8Key = new Uint8Array(pkcs8Header.length + privateKeyBytes.length + pkcs8Footer.length + 65);
-  pkcs8Key.set(pkcs8Header);
-  pkcs8Key.set(privateKeyBytes, pkcs8Header.length);
-  
+// Import raw key for ECDSA signing (ES256)
+async function importVapidSigningKey(publicKeyBase64: string, privateKeyBase64: string): Promise<CryptoKey> {
+  // Public key is typically the uncompressed P-256 point: 65 bytes (0x04 + X(32) + Y(32))
+  const publicKeyBytesRaw = urlBase64ToUint8Array(publicKeyBase64);
+  const publicKeyBytes = publicKeyBytesRaw.length === 64
+    ? new Uint8Array([0x04, ...publicKeyBytesRaw])
+    : publicKeyBytesRaw;
+
+  if (publicKeyBytes.length !== 65 || publicKeyBytes[0] !== 0x04) {
+    throw new Error(`Invalid VAPID public key length/format: ${publicKeyBytes.length}`);
+  }
+
+  const x = publicKeyBytes.slice(1, 33);
+  const y = publicKeyBytes.slice(33, 65);
+
+  // Private key should be 32 raw bytes
+  const dBytes = urlBase64ToUint8Array(privateKeyBase64);
+  if (dBytes.length !== 32) {
+    throw new Error(`Invalid VAPID private key length: ${dBytes.length}`);
+  }
+
+  const jwk: JsonWebKey = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: uint8ArrayToUrlBase64(x),
+    y: uint8ArrayToUrlBase64(y),
+    d: uint8ArrayToUrlBase64(dBytes),
+    ext: true,
+  };
+
   return await crypto.subtle.importKey(
-    'pkcs8',
-    pkcs8Key,
+    'jwk',
+    jwk,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
@@ -77,7 +86,7 @@ async function createVapidJwt(
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
   try {
-    const key = await importVapidKey(privateKey);
+    const key = await importVapidSigningKey(publicKey, privateKey);
     const signature = await crypto.subtle.sign(
       { name: 'ECDSA', hash: 'SHA-256' },
       key,
