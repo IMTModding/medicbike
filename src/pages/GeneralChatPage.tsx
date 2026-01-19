@@ -62,11 +62,12 @@ const GeneralChatPage = () => {
       }
 
       if (isAdmin) {
-        // Admin: get first invite code they created
+        // Admin: get active invite code they created
         const { data } = await supabase
           .from('invite_codes')
           .select('id')
           .eq('admin_id', user.id)
+          .eq('is_active', true)
           .limit(1)
           .maybeSingle();
         
