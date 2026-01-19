@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { sendChatNotification } from '@/services/pushNotifications';
-import { Send, MessageCircle, ArrowLeft, Trash2 } from 'lucide-react';
+import { Send, MessageCircle, ArrowLeft, Trash2, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -39,6 +39,8 @@ const GeneralChatPage = () => {
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [currentUserName, setCurrentUserName] = useState<string>('');
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -226,6 +228,36 @@ const GeneralChatPage = () => {
     setMessageToDelete(null);
   };
 
+  const startEditing = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditingText(msg.message);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setEditingText('');
+  };
+
+  const handleEditMessage = async () => {
+    if (!editingMessageId || !editingText.trim()) return;
+
+    const { error } = await supabase
+      .from('general_messages')
+      .update({ message: editingText.trim() })
+      .eq('id', editingMessageId);
+
+    if (error) {
+      console.error('Error updating message:', error);
+      toast.error('Erreur lors de la modification');
+    } else {
+      setMessages(prev => prev.map(m => 
+        m.id === editingMessageId ? { ...m, message: editingText.trim() } : m
+      ));
+      toast.success('Message modifié');
+    }
+    cancelEditing();
+  };
+
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -326,28 +358,68 @@ const GeneralChatPage = () => {
                       {senderName}
                     </span>
                   )}
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-2 group relative",
-                      isOwn
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-secondary text-foreground rounded-bl-md"
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setMessageToDelete(msg.id)}
-                        className={cn(
-                          "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity",
-                          "w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center",
-                          isOwn ? "-left-3" : "-right-3"
-                        )}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
+                  {editingMessageId === msg.id ? (
+                    <div className="flex items-center gap-2 max-w-[80%]">
+                      <Input
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="flex-1 text-sm h-9"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleEditMessage();
+                          } else if (e.key === 'Escape') {
+                            cancelEditing();
+                          }
+                        }}
+                      />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleEditMessage}>
+                        <Check className="w-4 h-4 text-green-500" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEditing}>
+                        <X className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-2xl px-4 py-2 group relative",
+                        isOwn
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-secondary text-foreground rounded-bl-md"
+                      )}
+                    >
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                      
+                      {/* Edit button - only for own messages */}
+                      {isOwn && (
+                        <button
+                          onClick={() => startEditing(msg)}
+                          className={cn(
+                            "absolute -top-2 -right-3 opacity-0 group-hover:opacity-100 transition-opacity",
+                            "w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-accent"
+                          )}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      
+                      {/* Delete button - only for admins */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => setMessageToDelete(msg.id)}
+                          className={cn(
+                            "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity",
+                            "w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center",
+                            isOwn ? "-left-3" : "-right-3"
+                          )}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <span className={cn(
                     "text-xs text-muted-foreground mt-1",
                     isOwn ? "mr-1" : "ml-1"
