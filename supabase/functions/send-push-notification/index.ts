@@ -71,7 +71,7 @@ async function importVapidKeyPairFromBase64Url(publicKeyBase64: string, privateK
     "jwk",
     publicJwk,
     { name: "ECDSA", namedCurve: "P-256" },
-    false,
+    true,
     ["verify"],
   );
 
@@ -79,7 +79,7 @@ async function importVapidKeyPairFromBase64Url(publicKeyBase64: string, privateK
     "jwk",
     privateJwk,
     { name: "ECDSA", namedCurve: "P-256" },
-    false,
+    true,
     ["sign"],
   );
 
