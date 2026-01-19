@@ -404,57 +404,87 @@ const GeneralChatPage = () => {
                       </Button>
                     </div>
                   ) : (
-                    <div
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-2 group relative cursor-pointer select-none",
-                        isOwn
-                          ? "bg-primary text-primary-foreground rounded-br-md"
-                          : "bg-secondary text-foreground rounded-bl-md",
-                        selectedMessageId === msg.id && "ring-2 ring-ring"
-                      )}
-                      onClick={() => handleMessagePress(msg.id)}
-                      onTouchStart={() => handleLongPressStart(msg)}
-                      onTouchEnd={handleLongPressEnd}
-                      onTouchCancel={handleLongPressEnd}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
-                      
-                      {/* Action buttons - visible on hover (desktop) or when selected (mobile) */}
-                      <div className={cn(
-                        "absolute -top-2 flex gap-1 transition-opacity",
-                        isOwn ? "-left-16" : "-right-16",
-                        // Desktop: show on hover, Mobile: show when selected
-                        "opacity-0 group-hover:opacity-100",
-                        selectedMessageId === msg.id && "opacity-100"
-                      )}>
-                        {/* Edit button - only for own messages */}
-                        {isOwn && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startEditing(msg);
-                              setSelectedMessageId(null);
-                            }}
-                            className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-accent active:scale-95"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
+                    <div className="flex flex-col">
+                      <div
+                        className={cn(
+                          "max-w-[80%] rounded-2xl px-4 py-2 group relative",
+                          isOwn
+                            ? "bg-primary text-primary-foreground rounded-br-md"
+                            : "bg-secondary text-foreground rounded-bl-md"
                         )}
+                        onClick={() => handleMessagePress(msg.id)}
+                      >
+                        <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                         
-                        {/* Delete button - only for admins */}
-                        {isAdmin && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMessageToDelete(msg.id);
-                              setSelectedMessageId(null);
-                            }}
-                            className="w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center active:scale-95"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        {/* Desktop: buttons visible on hover */}
+                        <div className={cn(
+                          "absolute -top-2 flex gap-1 transition-opacity",
+                          isOwn ? "-left-16" : "-right-16",
+                          "opacity-0 group-hover:opacity-100 max-md:hidden"
+                        )}>
+                          {isOwn && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(msg);
+                              }}
+                              className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-accent"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMessageToDelete(msg.id);
+                              }}
+                              className="w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      
+                      {/* Mobile: action buttons below message when selected */}
+                      {selectedMessageId === msg.id && (isOwn || isAdmin) && (
+                        <div className={cn(
+                          "flex gap-2 mt-2 md:hidden",
+                          isOwn ? "justify-end" : "justify-start"
+                        )}>
+                          {isOwn && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1.5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(msg);
+                                setSelectedMessageId(null);
+                              }}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Modifier
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 gap-1.5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMessageToDelete(msg.id);
+                                setSelectedMessageId(null);
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Supprimer
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   <span className={cn(
