@@ -202,12 +202,12 @@ const GeneralChatPage = () => {
       toast.error('Erreur lors de l\'envoi');
       setNewMessage(messageToSend); // Restore message on error
     } else {
-      // Send push notification to other users in the organization
+      // Send push notification to ALL users in the organization (including sender for testing)
       sendChatNotification(
         currentUserName || 'Nouveau message',
         messageToSend,
-        organizationId,
-        user.id
+        organizationId
+        // Not excluding sender anymore - everyone gets the notification
       );
     }
 
