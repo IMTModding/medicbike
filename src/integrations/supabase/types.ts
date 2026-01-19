@@ -340,6 +340,7 @@ export type Database = {
           full_name: string | null
           id: string
           invite_code_id: string | null
+          location_sharing_enabled: boolean
           onboarding_completed: boolean | null
           user_id: string
         }
@@ -350,6 +351,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
+          location_sharing_enabled?: boolean
           onboarding_completed?: boolean | null
           user_id: string
         }
@@ -360,6 +362,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           invite_code_id?: string | null
+          location_sharing_enabled?: boolean
           onboarding_completed?: boolean | null
           user_id?: string
         }
