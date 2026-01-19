@@ -339,8 +339,7 @@ serve(async (req: Request): Promise<Response> => {
         intervention_responses (
           id,
           status,
-          user_id,
-          profiles:user_id (full_name)
+          user_id
         )
       `)
       .eq('status', 'completed')
@@ -365,7 +364,35 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`Found ${interventions?.length || 0} interventions for this organization`);
 
-    const typedInterventions = (interventions || []) as unknown as Intervention[];
+    // Get all unique user IDs from responses to fetch their profiles
+    const allResponseUserIds = new Set<string>();
+    (interventions || []).forEach((intervention: any) => {
+      (intervention.intervention_responses || []).forEach((r: any) => {
+        if (r.user_id) allResponseUserIds.add(r.user_id);
+      });
+    });
+
+    // Fetch profiles for all response users
+    let userProfilesMap: Record<string, string> = {};
+    if (allResponseUserIds.size > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', Array.from(allResponseUserIds));
+      
+      (profiles || []).forEach((p: any) => {
+        userProfilesMap[p.user_id] = p.full_name || 'Utilisateur';
+      });
+    }
+
+    // Map interventions with profile names
+    const typedInterventions: Intervention[] = (interventions || []).map((intervention: any) => ({
+      ...intervention,
+      intervention_responses: (intervention.intervention_responses || []).map((r: any) => ({
+        ...r,
+        profiles: { full_name: userProfilesMap[r.user_id] || null }
+      }))
+    }));
 
     let attachment;
     let filename: string;
