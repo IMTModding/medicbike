@@ -515,6 +515,12 @@ export type Database = {
           user_invite_code_id: string
         }[]
       }
+      get_user_profile_access: {
+        Args: { requesting_user_id: string }
+        Returns: {
+          accessible_user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
