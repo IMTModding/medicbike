@@ -55,7 +55,10 @@ export const NotificationToggle = () => {
         setIsSubscribed(false);
         setPermission(getNotificationPermission());
       } else {
+        console.log('[NotifToggle] Attempting to subscribe...');
         const success = await subscribeToPush(user.id);
+        console.log('[NotifToggle] Subscribe result:', success);
+        
         if (success) {
           toast.success('Notifications activées !');
           setIsSubscribed(true);
@@ -63,15 +66,24 @@ export const NotificationToggle = () => {
         } else {
           const current = getNotificationPermission();
           setPermission(current);
-          if (current === 'granted') {
-            toast.error("Notifications non configurées sur cet appareil (clé VAPID manquante ou navigateur incompatible)");
+          
+          if (current === 'denied') {
+            toast.error("Notifications bloquées. Activez-les dans les paramètres de votre navigateur.");
+          } else if (current === 'default') {
+            toast.error("Vous devez autoriser les notifications quand demandé.");
           } else {
-            toast.error("Impossible d'activer les notifications");
+            // Permission granted but still failed
+            toast.error("Erreur technique. Essayez de rafraîchir la page.", {
+              action: {
+                label: 'Rafraîchir',
+                onClick: () => window.location.reload(),
+              },
+            });
           }
         }
       }
     } catch (error) {
-      console.error('Toggle error:', error);
+      console.error('[NotifToggle] Toggle error:', error);
       toast.error('Une erreur est survenue');
     } finally {
       setLoading(false);

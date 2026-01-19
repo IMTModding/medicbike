@@ -11,15 +11,22 @@ async function getVapidPublicKey(): Promise<string> {
     return cachedVapidPublicKey;
   }
 
-  const { data, error } = await supabase.functions.invoke('vapid-public-key');
-  if (error) {
-    console.error('Unable to fetch VAPID public key:', error);
+  try {
+    console.log('[Push] Fetching VAPID public key from backend...');
+    const { data, error } = await supabase.functions.invoke('vapid-public-key');
+    if (error) {
+      console.error('[Push] Unable to fetch VAPID public key:', error);
+      return '';
+    }
+
+    const key = (data as any)?.publicKey || '';
+    console.log('[Push] VAPID key fetched, length:', key.length);
+    cachedVapidPublicKey = key;
+    return key;
+  } catch (err) {
+    console.error('[Push] Exception fetching VAPID key:', err);
     return '';
   }
-
-  const key = (data as any)?.publicKey || '';
-  cachedVapidPublicKey = key;
-  return key;
 }
 
 export const isPushSupported = (): boolean => {
@@ -33,18 +40,18 @@ export const getNotificationPermission = (): NotificationPermission => {
 
 export const requestNotificationPermission = async (): Promise<NotificationPermission> => {
   if (!('Notification' in window)) {
-    console.log('Notifications not supported');
+    console.log('[Push] Notifications not supported');
     return 'denied';
   }
   
   const permission = await Notification.requestPermission();
-  console.log('Notification permission:', permission);
+  console.log('[Push] Notification permission:', permission);
   return permission;
 };
 
 export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration | null> => {
   if (!('serviceWorker' in navigator)) {
-    console.log('Service Worker not supported');
+    console.log('[Push] Service Worker not supported');
     return null;
   }
 
@@ -52,10 +59,10 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
-    console.log('Service Worker registered:', registration.scope);
+    console.log('[Push] Service Worker registered:', registration.scope);
     return registration;
   } catch (error) {
-    console.error('Service Worker registration failed:', error);
+    console.error('[Push] Service Worker registration failed:', error);
     return null;
   }
 };
@@ -76,45 +83,64 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export const subscribeToPush = async (userId: string): Promise<boolean> => {
+  console.log('[Push] Starting subscription for user:', userId);
+  
   try {
+    // Step 1: Request permission
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      console.log('Notification permission denied');
+      console.log('[Push] Permission denied');
       return false;
     }
 
+    // Step 2: Register service worker
     const registration = await registerServiceWorker();
     if (!registration) {
-      console.log('No service worker registration');
+      console.log('[Push] No service worker registration');
       return false;
     }
 
-    // Wait for service worker to be ready
+    // Step 3: Wait for service worker to be ready
+    console.log('[Push] Waiting for service worker to be ready...');
     await navigator.serviceWorker.ready;
+    console.log('[Push] Service worker ready');
 
-    // Check for existing subscription
-    let subscription = await registration.pushManager.getSubscription();
-
+    // Step 4: Get VAPID key
     const vapidPublicKey = await getVapidPublicKey();
+    if (!vapidPublicKey) {
+      console.error('[Push] VAPID public key is empty!');
+      return false;
+    }
+    console.log('[Push] Using VAPID key:', vapidPublicKey.substring(0, 20) + '...');
 
-    if (!subscription && vapidPublicKey) {
-      // Create new subscription with VAPID key
-      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey,
-      });
-      console.log('Push subscription created:', subscription);
+    // Step 5: Get or create subscription
+    let subscription = await registration.pushManager.getSubscription();
+    console.log('[Push] Existing subscription:', subscription ? 'yes' : 'no');
+
+    if (!subscription) {
+      try {
+        console.log('[Push] Creating new subscription...');
+        const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+        console.log('[Push] Subscription created successfully');
+      } catch (subError) {
+        console.error('[Push] Error creating subscription:', subError);
+        return false;
+      }
     }
 
-    if (!subscription && !vapidPublicKey) {
-      console.warn('VAPID public key missing; cannot subscribe to push');
+    if (!subscription) {
+      console.error('[Push] No subscription available');
+      return false;
     }
 
-    if (!subscription) return false;
-
-    // Save subscription to database
+    // Step 6: Save subscription to database
     const subscriptionJson = subscription.toJSON();
+    console.log('[Push] Saving subscription to database...');
+    
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert(
@@ -130,24 +156,25 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
       );
 
     if (error) {
-      console.error('Error saving subscription:', error);
+      console.error('[Push] Error saving subscription:', error);
       return false;
     }
 
-    console.log('Subscription saved to database');
+    console.log('[Push] Subscription saved successfully!');
     return true;
   } catch (error) {
-    console.error('Error subscribing to push:', error);
+    console.error('[Push] Error subscribing to push:', error);
     return false;
   }
 };
 
 export const getCurrentPushSubscription = async (): Promise<PushSubscription | null> => {
   try {
+    if (!('serviceWorker' in navigator)) return null;
     const registration = await navigator.serviceWorker.ready;
     return await registration.pushManager.getSubscription();
   } catch (error) {
-    console.error('Error getting push subscription:', error);
+    console.error('[Push] Error getting push subscription:', error);
     return null;
   }
 };
@@ -177,12 +204,12 @@ export const ensurePushSubscription = async (userId: string): Promise<boolean> =
           { onConflict: 'user_id,endpoint' }
         );
       if (error) {
-        console.error('Error re-saving subscription:', error);
+        console.error('[Push] Error re-saving subscription:', error);
         return false;
       }
       return true;
     } catch (e) {
-      console.error('Error re-saving subscription:', e);
+      console.error('[Push] Error re-saving subscription:', e);
       return false;
     }
   }
@@ -206,12 +233,12 @@ export const unsubscribeFromPush = async (userId: string): Promise<boolean> => {
         .eq('user_id', userId)
         .eq('endpoint', subscription.endpoint);
       
-      console.log('Unsubscribed from push');
+      console.log('[Push] Unsubscribed from push');
     }
 
     return true;
   } catch (error) {
-    console.error('Error unsubscribing:', error);
+    console.error('[Push] Error unsubscribing:', error);
     return false;
   }
 };
@@ -228,14 +255,14 @@ export const sendPushNotification = async (
     });
 
     if (error) {
-      console.error('Error sending push:', error);
+      console.error('[Push] Error sending push:', error);
       return false;
     }
 
-    console.log('Push notification sent');
+    console.log('[Push] Push notification sent');
     return true;
   } catch (error) {
-    console.error('Error sending push:', error);
+    console.error('[Push] Error sending push:', error);
     return false;
   }
 };
@@ -244,7 +271,7 @@ export const sendChatNotification = async (
   senderName: string,
   message: string,
   organizationId: string,
-  excludeUserId: string
+  excludeUserId?: string
 ): Promise<boolean> => {
   try {
     const { error } = await supabase.functions.invoke('send-push-notification', {
@@ -253,19 +280,20 @@ export const sendChatNotification = async (
         body: message.length > 50 ? message.substring(0, 50) + '...' : message,
         type: 'chat',
         organizationId,
-        excludeUserId,
+        // Only exclude if explicitly provided
+        ...(excludeUserId && { excludeUserId }),
       },
     });
 
     if (error) {
-      console.error('Error sending chat notification:', error);
+      console.error('[Push] Error sending chat notification:', error);
       return false;
     }
 
-    console.log('Chat notification sent');
+    console.log('[Push] Chat notification sent');
     return true;
   } catch (error) {
-    console.error('Error sending chat notification:', error);
+    console.error('[Push] Error sending chat notification:', error);
     return false;
   }
 };
