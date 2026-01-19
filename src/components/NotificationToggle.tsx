@@ -8,6 +8,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
   ensurePushSubscription,
+  getLastSubscriptionError,
 } from '@/services/pushNotifications';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -65,6 +66,7 @@ export const NotificationToggle = () => {
           setPermission('granted');
         } else {
           const current = getNotificationPermission();
+          const lastError = getLastSubscriptionError();
           setPermission(current);
           
           if (current === 'denied') {
@@ -72,8 +74,11 @@ export const NotificationToggle = () => {
           } else if (current === 'default') {
             toast.error("Vous devez autoriser les notifications quand demandé.");
           } else {
-            // Permission granted but still failed
-            toast.error("Erreur technique. Essayez de rafraîchir la page.", {
+            // Permission granted but still failed - show the actual error
+            const errorMsg = lastError || "Erreur inconnue";
+            console.error('[NotifToggle] Failed with error:', errorMsg);
+            toast.error(`Échec: ${errorMsg}`, {
+              duration: 8000,
               action: {
                 label: 'Rafraîchir',
                 onClick: () => window.location.reload(),

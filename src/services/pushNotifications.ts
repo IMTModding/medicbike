@@ -82,64 +82,82 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+// Store last error for debugging
+let lastSubscriptionError: string | null = null;
+
+export const getLastSubscriptionError = (): string | null => lastSubscriptionError;
+
 export const subscribeToPush = async (userId: string): Promise<boolean> => {
   console.log('[Push] Starting subscription for user:', userId);
+  lastSubscriptionError = null;
   
   try {
     // Step 1: Request permission
+    console.log('[Push] Step 1: Requesting permission...');
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      console.log('[Push] Permission denied');
+      lastSubscriptionError = `Permission: ${permission}`;
+      console.log('[Push] Permission denied:', permission);
       return false;
     }
+    console.log('[Push] Permission granted');
 
     // Step 2: Register service worker
+    console.log('[Push] Step 2: Registering service worker...');
     const registration = await registerServiceWorker();
     if (!registration) {
+      lastSubscriptionError = 'Service Worker non enregistré';
       console.log('[Push] No service worker registration');
       return false;
     }
+    console.log('[Push] SW registered');
 
     // Step 3: Wait for service worker to be ready
-    console.log('[Push] Waiting for service worker to be ready...');
+    console.log('[Push] Step 3: Waiting for service worker to be ready...');
     await navigator.serviceWorker.ready;
     console.log('[Push] Service worker ready');
 
     // Step 4: Get VAPID key
+    console.log('[Push] Step 4: Fetching VAPID key...');
     const vapidPublicKey = await getVapidPublicKey();
     if (!vapidPublicKey) {
+      lastSubscriptionError = 'Clé VAPID vide';
       console.error('[Push] VAPID public key is empty!');
       return false;
     }
-    console.log('[Push] Using VAPID key:', vapidPublicKey.substring(0, 20) + '...');
+    console.log('[Push] VAPID key obtained, length:', vapidPublicKey.length);
 
     // Step 5: Get or create subscription
+    console.log('[Push] Step 5: Getting/creating subscription...');
     let subscription = await registration.pushManager.getSubscription();
     console.log('[Push] Existing subscription:', subscription ? 'yes' : 'no');
 
     if (!subscription) {
       try {
-        console.log('[Push] Creating new subscription...');
+        console.log('[Push] Creating new subscription with VAPID...');
         const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey,
         });
-        console.log('[Push] Subscription created successfully');
-      } catch (subError) {
-        console.error('[Push] Error creating subscription:', subError);
+        console.log('[Push] Subscription created:', subscription.endpoint.substring(0, 50));
+      } catch (subError: unknown) {
+        const err = subError as Error;
+        lastSubscriptionError = `Subscribe error: ${err.message}`;
+        console.error('[Push] Error creating subscription:', err.message, err);
         return false;
       }
     }
 
     if (!subscription) {
+      lastSubscriptionError = 'Subscription null après création';
       console.error('[Push] No subscription available');
       return false;
     }
 
     // Step 6: Save subscription to database
+    console.log('[Push] Step 6: Saving to database...');
     const subscriptionJson = subscription.toJSON();
-    console.log('[Push] Saving subscription to database...');
     
     const { error } = await supabase
       .from('push_subscriptions')
@@ -156,14 +174,17 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
       );
 
     if (error) {
+      lastSubscriptionError = `DB error: ${error.message}`;
       console.error('[Push] Error saving subscription:', error);
       return false;
     }
 
-    console.log('[Push] Subscription saved successfully!');
+    console.log('[Push] SUCCESS! Subscription saved.');
     return true;
-  } catch (error) {
-    console.error('[Push] Error subscribing to push:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    lastSubscriptionError = `Exception: ${err.message}`;
+    console.error('[Push] Exception in subscribeToPush:', err);
     return false;
   }
 };
