@@ -404,10 +404,10 @@ const GeneralChatPage = () => {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-col">
+                    <div className="flex flex-col max-w-[80%]">
                       <div
                         className={cn(
-                          "max-w-[80%] rounded-2xl px-4 py-2 group relative",
+                          "rounded-2xl px-4 py-2 group relative",
                           isOwn
                             ? "bg-primary text-primary-foreground rounded-br-md"
                             : "bg-secondary text-foreground rounded-bl-md"
