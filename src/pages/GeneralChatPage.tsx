@@ -138,7 +138,7 @@ const GeneralChatPage = () => {
 
     fetchMessages();
 
-    // Subscribe to new messages
+    // Subscribe to messages (INSERT, UPDATE, DELETE)
     const channel = supabase
       .channel('general-chat')
       .on(
@@ -166,6 +166,32 @@ const GeneralChatPage = () => {
           }
 
           setMessages(prev => [...prev, newMsg]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'general_messages',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          const updatedMsg = payload.new as Message;
+          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'general_messages',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as { id: string }).id;
+          setMessages(prev => prev.filter(m => m.id !== deletedId));
         }
       )
       .subscribe();
