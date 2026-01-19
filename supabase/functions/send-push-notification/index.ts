@@ -280,10 +280,8 @@ serve(async (req) => {
 
     const vapidKeys = await importVapidKeyPairFromBase64Url(vapidPublicKey, vapidPrivateKey);
 
-    // Library constructor expects 'keys' and 'vapidKeys'. We use the same VAPID keypair.
     const appServer = await webpush.ApplicationServer.new({
       contactInformation: "mailto:contact@medicbike.lovable.app",
-      keys: vapidKeys,
       vapidKeys,
     });
 
