@@ -102,8 +102,6 @@ const GeneralChatPage = () => {
     if (!organizationId) return;
 
     const fetchMessages = async () => {
-      setLoadingMessages(true);
-
       const { data: messagesData, error } = await supabase
         .from('general_messages')
         .select('*')
@@ -112,7 +110,6 @@ const GeneralChatPage = () => {
 
       if (error) {
         console.error('Error fetching messages:', error);
-        setLoadingMessages(false);
         return;
       }
 
@@ -196,10 +193,26 @@ const GeneralChatPage = () => {
       )
       .subscribe();
 
+    // Refresh messages when app comes back to foreground (mobile)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchMessages();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also refresh on window focus (desktop)
+    const handleFocus = () => {
+      fetchMessages();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       channel.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
-  }, [organizationId]);
+  }, [organizationId, profiles]);
 
   // Auto-scroll to bottom
   useEffect(() => {
