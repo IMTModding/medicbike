@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { sendChatNotification } from '@/services/pushNotifications';
-import { Send, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Send, MessageCircle, ArrowLeft, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface Message {
   id: string;
@@ -37,6 +38,7 @@ const GeneralChatPage = () => {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [currentUserName, setCurrentUserName] = useState<string>('');
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -208,6 +210,22 @@ const GeneralChatPage = () => {
     setSending(false);
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    const { error } = await supabase
+      .from('general_messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('Error deleting message:', error);
+      toast.error('Erreur lors de la suppression');
+    } else {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      toast.success('Message supprimé');
+    }
+    setMessageToDelete(null);
+  };
+
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -310,13 +328,25 @@ const GeneralChatPage = () => {
                   )}
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-2",
+                      "max-w-[80%] rounded-2xl px-4 py-2 group relative",
                       isOwn
                         ? "bg-primary text-primary-foreground rounded-br-md"
                         : "bg-secondary text-foreground rounded-bl-md"
                     )}
                   >
                     <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setMessageToDelete(msg.id)}
+                        className={cn(
+                          "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity",
+                          "w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center",
+                          isOwn ? "-left-3" : "-right-3"
+                        )}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                   <span className={cn(
                     "text-xs text-muted-foreground mt-1",
@@ -347,6 +377,17 @@ const GeneralChatPage = () => {
           </Button>
         </form>
       </footer>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={!!messageToDelete}
+        onOpenChange={(open) => !open && setMessageToDelete(null)}
+        title="Supprimer le message"
+        description="Êtes-vous sûr de vouloir supprimer ce message ? Cette action est irréversible."
+        confirmLabel="Supprimer"
+        onConfirm={() => messageToDelete && handleDeleteMessage(messageToDelete)}
+        variant="destructive"
+      />
     </div>
   );
 };
