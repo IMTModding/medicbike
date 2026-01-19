@@ -61,42 +61,102 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
 
   // Start GPS tracking when user becomes available
-  const startGpsTracking = async () => {
-    if (!user || !navigator.geolocation) {
-      console.error('Geolocation not supported');
-      return;
-    }
+  const startGpsTracking = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!user) {
+        toast.error('Utilisateur non connecté');
+        resolve(false);
+        return;
+      }
 
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 5000
-    };
+      if (!navigator.geolocation) {
+        toast.error('La géolocalisation n\'est pas supportée par votre navigateur');
+        resolve(false);
+        return;
+      }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      async (position) => {
-        const { error: dbError } = await supabase
-          .from('user_locations')
-          .upsert({
-            user_id: user.id,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            updated_at: new Date().toISOString(),
-            is_active: true
-          }, {
-            onConflict: 'user_id'
-          });
-        
-        if (dbError) {
-          console.error('Error updating location:', dbError);
-        }
-      },
-      (err) => {
-        console.error('Geolocation error:', err);
-      },
-      options
-    );
+      const options: PositionOptions = {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      };
+
+      // First, get a single position to confirm GPS works
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          console.log('GPS position obtained:', position.coords);
+          
+          // Save initial position
+          const { error: dbError } = await supabase
+            .from('user_locations')
+            .upsert({
+              user_id: user.id,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              updated_at: new Date().toISOString(),
+              is_active: true
+            }, {
+              onConflict: 'user_id'
+            });
+          
+          if (dbError) {
+            console.error('Error saving location:', dbError);
+            toast.error('Erreur lors de l\'enregistrement de la position');
+            resolve(false);
+            return;
+          }
+
+          console.log('Location saved to database');
+
+          // Then start watching for continuous updates
+          watchIdRef.current = navigator.geolocation.watchPosition(
+            async (pos) => {
+              const { error } = await supabase
+                .from('user_locations')
+                .upsert({
+                  user_id: user.id,
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  accuracy: pos.coords.accuracy,
+                  updated_at: new Date().toISOString(),
+                  is_active: true
+                }, {
+                  onConflict: 'user_id'
+                });
+              
+              if (error) {
+                console.error('Error updating location:', error);
+              }
+            },
+            (err) => {
+              console.error('Watch position error:', err);
+            },
+            options
+          );
+
+          resolve(true);
+        },
+        (err) => {
+          console.error('Geolocation error:', err);
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              toast.error('Permission GPS refusée. Veuillez autoriser la géolocalisation dans les paramètres de votre navigateur.');
+              break;
+            case err.POSITION_UNAVAILABLE:
+              toast.error('Position GPS indisponible. Vérifiez que le GPS est activé.');
+              break;
+            case err.TIMEOUT:
+              toast.error('Délai d\'attente GPS dépassé. Réessayez.');
+              break;
+            default:
+              toast.error('Erreur GPS: ' + err.message);
+          }
+          resolve(false);
+        },
+        options
+      );
+    });
   };
 
   // Cleanup GPS tracking on unmount
@@ -110,8 +170,13 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
 
   const handleAvailable = async () => {
     // Start GPS tracking when user clicks "Dispo"
-    await startGpsTracking();
-    toast.success('GPS activé - Votre position est partagée');
+    const gpsStarted = await startGpsTracking();
+    
+    if (gpsStarted) {
+      toast.success('GPS activé - Votre position est partagée');
+    }
+    
+    // Still mark as available even if GPS fails
     onStatusChange(intervention.id, 'available');
   };
 
