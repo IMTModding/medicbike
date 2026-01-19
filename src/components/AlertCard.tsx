@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 interface AlertCardProps {
   intervention: Intervention;
   onStatusChange: (id: string, status: 'available' | 'unavailable') => void;
@@ -51,12 +52,68 @@ const getTimeAgo = (dateString: string) => {
 };
 
 export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCardProps) => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
   const timeAgo = getTimeAgo(intervention.created_at);
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
+
+  // Start GPS tracking when user becomes available
+  const startGpsTracking = async () => {
+    if (!user || !navigator.geolocation) {
+      console.error('Geolocation not supported');
+      return;
+    }
+
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (position) => {
+        const { error: dbError } = await supabase
+          .from('user_locations')
+          .upsert({
+            user_id: user.id,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            updated_at: new Date().toISOString(),
+            is_active: true
+          }, {
+            onConflict: 'user_id'
+          });
+        
+        if (dbError) {
+          console.error('Error updating location:', dbError);
+        }
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+      },
+      options
+    );
+  };
+
+  // Cleanup GPS tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  const handleAvailable = async () => {
+    // Start GPS tracking when user clicks "Dispo"
+    await startGpsTracking();
+    toast.success('GPS activé - Votre position est partagée');
+    onStatusChange(intervention.id, 'available');
+  };
 
   const handleComplete = () => {
     if (onComplete) {
@@ -185,7 +242,7 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
               variant="available"
               size="xl"
               className="flex-1"
-              onClick={() => onStatusChange(intervention.id, 'available')}
+              onClick={handleAvailable}
             >
               <CheckCircle2 />
               Dispo

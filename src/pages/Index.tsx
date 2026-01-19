@@ -7,7 +7,7 @@ import Onboarding from '@/components/Onboarding';
 import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
-import LocationTracker from '@/components/LocationTracker';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useOfflineMode } from '@/hooks/useOfflineMode';
@@ -27,24 +27,6 @@ const Index = () => {
   const navigate = useNavigate();
   const { showOnboarding, completeOnboarding } = useOnboarding();
   const { isOnline, cacheInterventions, getCacheTimestamp, cachedInterventions } = useOfflineMode();
-  const [locationSharingEnabled, setLocationSharingEnabled] = useState(false);
-
-  // Check if user has enabled location sharing consent
-  useEffect(() => {
-    if (!user) return;
-    
-    const checkLocationConsent = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('location_sharing_enabled')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      setLocationSharingEnabled(data?.location_sharing_enabled ?? false);
-    };
-    
-    checkLocationConsent();
-  }, [user]);
 
   // React Query hooks for cached data
   const { 
@@ -194,13 +176,6 @@ const Index = () => {
 
         {/* Availability Calendar */}
         <AvailabilityCalendar />
-
-        {/* Location Tracker - show only if user consented to location sharing */}
-        {locationSharingEnabled && (
-          <div className="mb-6">
-            <LocationTracker />
-          </div>
-        )}
 
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-card rounded-xl p-3 border border-border">
