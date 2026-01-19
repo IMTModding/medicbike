@@ -371,7 +371,7 @@ const GeneralChatPage = () => {
                 <div
                   key={msg.id}
                   className={cn(
-                    "flex flex-col",
+                    "flex flex-col w-full",
                     isOwn ? "items-end" : "items-start"
                   )}
                 >
