@@ -29,29 +29,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Create admin client
-    const supabaseAdmin = createClient(
+    // Create a client with user's token for verification
+    const supabaseWithAuth = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Verify the requester is an admin
+    // Verify the token using getClaims
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const { data: claimsData, error: claimsError } = await supabaseWithAuth.auth.getClaims(token);
     
-    if (userError || !userData.user) {
-      console.error("Invalid token:", userError);
+    if (claimsError || !claimsData?.claims) {
+      console.error("Invalid token:", claimsError);
       return new Response(
         JSON.stringify({ error: "Token invalide" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const userId = claimsData.claims.sub as string;
+
+    // Create admin client for privileged operations
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     // Check if user is admin
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", userData.user.id)
+      .eq("user_id", userId)
       .single();
 
     if (roleError || roleData?.role !== "admin") {
@@ -136,7 +145,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (role === "employee" && inviteCodeId) {
       profileData.invite_code_id = inviteCodeId;
-      profileData.admin_id = userData.user.id;
+      profileData.admin_id = userId;
     } else if (role === "admin") {
       profileData.admin_id = newUser.user.id;
     }
