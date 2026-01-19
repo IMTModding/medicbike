@@ -41,7 +41,9 @@ const GeneralChatPage = () => {
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -258,6 +260,26 @@ const GeneralChatPage = () => {
     cancelEditing();
   };
 
+  const handleMessagePress = (msgId: string) => {
+    // Toggle selection on tap for mobile
+    setSelectedMessageId(prev => prev === msgId ? null : msgId);
+  };
+
+  const handleLongPressStart = (msg: Message) => {
+    longPressTimer.current = setTimeout(() => {
+      if (msg.user_id === user?.id) {
+        startEditing(msg);
+      }
+    }, 500);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -384,40 +406,55 @@ const GeneralChatPage = () => {
                   ) : (
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-2 group relative",
+                        "max-w-[80%] rounded-2xl px-4 py-2 group relative cursor-pointer select-none",
                         isOwn
                           ? "bg-primary text-primary-foreground rounded-br-md"
-                          : "bg-secondary text-foreground rounded-bl-md"
+                          : "bg-secondary text-foreground rounded-bl-md",
+                        selectedMessageId === msg.id && "ring-2 ring-ring"
                       )}
+                      onClick={() => handleMessagePress(msg.id)}
+                      onTouchStart={() => handleLongPressStart(msg)}
+                      onTouchEnd={handleLongPressEnd}
+                      onTouchCancel={handleLongPressEnd}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                       
-                      {/* Edit button - only for own messages */}
-                      {isOwn && (
-                        <button
-                          onClick={() => startEditing(msg)}
-                          className={cn(
-                            "absolute -top-2 -right-3 opacity-0 group-hover:opacity-100 transition-opacity",
-                            "w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-accent"
-                          )}
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                      )}
-                      
-                      {/* Delete button - only for admins */}
-                      {isAdmin && (
-                        <button
-                          onClick={() => setMessageToDelete(msg.id)}
-                          className={cn(
-                            "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity",
-                            "w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center",
-                            isOwn ? "-left-3" : "-right-3"
-                          )}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
+                      {/* Action buttons - visible on hover (desktop) or when selected (mobile) */}
+                      <div className={cn(
+                        "absolute -top-2 flex gap-1 transition-opacity",
+                        isOwn ? "-left-16" : "-right-16",
+                        // Desktop: show on hover, Mobile: show when selected
+                        "opacity-0 group-hover:opacity-100",
+                        selectedMessageId === msg.id && "opacity-100"
+                      )}>
+                        {/* Edit button - only for own messages */}
+                        {isOwn && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditing(msg);
+                              setSelectedMessageId(null);
+                            }}
+                            className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:bg-accent active:scale-95"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        
+                        {/* Delete button - only for admins */}
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMessageToDelete(msg.id);
+                              setSelectedMessageId(null);
+                            }}
+                            className="w-7 h-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center active:scale-95"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                   <span className={cn(
