@@ -98,11 +98,12 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
     const vapidPublicKey = await getVapidPublicKey();
 
     if (!subscription && vapidPublicKey) {
-      // Create new subscription with properly typed applicationServerKey
-      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+      // Create new subscription
+      // NOTE: PushManager.subscribe expects a Uint8Array for applicationServerKey
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
+        applicationServerKey,
       });
       console.log('Push subscription created:', subscription);
     }
