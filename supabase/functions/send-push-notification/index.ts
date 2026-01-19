@@ -151,7 +151,8 @@ serve(async (req) => {
       organizationId, 
       excludeUserId, 
       newsId,
-      senderUserId: providedSenderUserId
+      senderUserId: providedSenderUserId,
+      employeeUserId
     } = body;
     
     let senderUserId = providedSenderUserId;
@@ -183,7 +184,19 @@ serve(async (req) => {
 
     let userIdsToNotify: string[] = [];
     
-    if (type === 'news' && senderUserId) {
+    if (type === 'login' && organizationId && employeeUserId) {
+      // Login notification - notify admin of the organization
+      const { data: inviteCode } = await supabase
+        .from('invite_codes')
+        .select('admin_id')
+        .eq('id', organizationId)
+        .single();
+      
+      if (inviteCode?.admin_id) {
+        userIdsToNotify = [inviteCode.admin_id];
+        console.log('Login notification - Notifying admin:', inviteCode.admin_id);
+      }
+    } else if (type === 'news' && senderUserId) {
       const { data: inviteCode } = await supabase
         .from('invite_codes')
         .select('id')
@@ -288,12 +301,14 @@ serve(async (req) => {
     const getNotificationUrl = () => {
       if (type === 'chat') return '/general-chat';
       if (type === 'news') return '/news';
+      if (type === 'login') return '/employees';
       return '/';
     };
 
     const getNotificationTag = () => {
       if (type === 'chat') return `chat-${organizationId}`;
       if (type === 'news') return `news-${newsId}`;
+      if (type === 'login') return `login-${employeeUserId}`;
       return `intervention-${interventionId}`;
     };
 

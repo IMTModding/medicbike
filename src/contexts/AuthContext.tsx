@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { recordLogin } from '@/hooks/useLoginHistory';
+import { sendLoginNotification } from '@/services/loginNotifications';
 import logo from '@/assets/logo.jpg';
 
 type UserRole = 'admin' | 'employee';
@@ -170,9 +171,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
     });
     
-    // Record login on successful sign in
+    // Record login and send notification on successful sign in
     if (!error && data.user) {
       recordLogin(data.user.id);
+      // Send login notification to admin (async, don't await)
+      sendLoginNotification(data.user.id);
     }
     
     return { error };
