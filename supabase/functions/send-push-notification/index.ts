@@ -36,7 +36,6 @@ function uint8ArrayToUrlBase64(uint8Array: Uint8Array): string {
 }
 
 async function importVapidKeyPairFromBase64Url(publicKeyBase64: string, privateKeyBase64: string): Promise<CryptoKeyPair> {
-  // Public key is usually 65 bytes (0x04 + X32 + Y32) or 64 bytes (X32 + Y32)
   const publicRaw = urlBase64ToUint8Array(publicKeyBase64);
   const publicBytes = publicRaw.length === 64 ? new Uint8Array([0x04, ...publicRaw]) : publicRaw;
 
@@ -145,7 +144,6 @@ async function sendEncryptedWebPush(args: {
 }) {
   const { subscription, payload, appServer, ttl, urgency } = args;
   const subscriber = appServer.subscribe(subscription);
-  // throws PushMessageError on failure
   await subscriber.pushTextMessage(payload, { ttl, urgency });
 }
 
@@ -219,10 +217,12 @@ serve(async (req) => {
       const { data: inviteCode } = await supabase.from("invite_codes").select("admin_id").eq("id", organizationId).single();
       if (inviteCode?.admin_id) userIdsToNotify = [inviteCode.admin_id];
     } else if (type === "news" && senderUserId) {
-      // News notification: notify all org members
-      const { data: inviteCode } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId).single();
-      if (inviteCode?.id) {
-        const { data: orgMembers } = await supabase.from("profiles").select("user_id").eq("invite_code_id", inviteCode.id);
+      // News notification: notify all org members from ALL admin's orgs
+      const { data: inviteCodes } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId);
+      const orgIds = (inviteCodes || []).map((ic) => ic.id);
+      
+      if (orgIds.length > 0) {
+        const { data: orgMembers } = await supabase.from("profiles").select("user_id").in("invite_code_id", orgIds);
         userIdsToNotify = (orgMembers || []).map((p) => p.user_id);
       }
     } else if (type === "chat" && organizationId) {
@@ -233,7 +233,7 @@ serve(async (req) => {
         .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
       userIdsToNotify = (orgProfiles || []).map((p) => p.user_id).filter((id) => id !== excludeUserId);
     } else if (type === "intervention" && senderUserId) {
-      // Intervention notification: notify ALL members of the sender's organization (except sender)
+      // Intervention notification: notify ALL members of the sender's organization(s) (except sender)
       console.log("Processing intervention notification for sender:", senderUserId);
       
       // Check if sender is admin
@@ -242,46 +242,70 @@ serve(async (req) => {
         .select("role")
         .eq("user_id", senderUserId)
         .eq("role", "admin")
-        .single();
+        .maybeSingle();
 
-      let orgId: string | null = null;
+      const allMemberIds: string[] = [];
 
       if (adminCheck) {
-        // Sender is admin - get their org ID
-        const { data: inviteCode } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId).single();
-        orgId = inviteCode?.id || null;
-        console.log("Sender is admin, org ID:", orgId);
+        // Sender is admin - get ALL their invite codes
+        const { data: inviteCodes } = await supabase
+          .from("invite_codes")
+          .select("id")
+          .eq("admin_id", senderUserId);
+        
+        const orgIds = (inviteCodes || []).map((ic) => ic.id);
+        console.log("Sender is admin, org IDs:", orgIds);
+
+        if (orgIds.length > 0) {
+          // Get all members from all organizations
+          const { data: orgMembers } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .in("invite_code_id", orgIds);
+          
+          (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+          console.log("Found org members:", (orgMembers || []).length);
+        }
       } else {
         // Sender is employee - get their org ID from profile
         const { data: senderProfile } = await supabase
           .from("profiles")
           .select("invite_code_id")
           .eq("user_id", senderUserId)
-          .single();
-        orgId = senderProfile?.invite_code_id || null;
+          .maybeSingle();
+        
+        const orgId = senderProfile?.invite_code_id || null;
         console.log("Sender is employee, org ID:", orgId);
+
+        if (orgId) {
+          // Get all org members
+          const { data: orgMembers } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .eq("invite_code_id", orgId);
+          
+          // Get admin of the org
+          const { data: adminProfile } = await supabase
+            .from("invite_codes")
+            .select("admin_id")
+            .eq("id", orgId)
+            .maybeSingle();
+          
+          (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+          if (adminProfile?.admin_id) allMemberIds.push(adminProfile.admin_id);
+        }
       }
 
-      if (orgId) {
-        // Get all org members
-        const { data: orgMembers } = await supabase.from("profiles").select("user_id").eq("invite_code_id", orgId);
-        // Get admin of the org
-        const { data: adminProfile } = await supabase.from("invite_codes").select("admin_id").eq("id", orgId).single();
-        
-        const memberIds = (orgMembers || []).map((p) => p.user_id);
-        if (adminProfile?.admin_id) memberIds.push(adminProfile.admin_id);
-        
-        // Remove duplicates and exclude sender
-        userIdsToNotify = [...new Set(memberIds)].filter((id) => id !== senderUserId);
-        console.log("Users to notify for intervention:", userIdsToNotify.length);
-      }
+      // Remove duplicates and exclude sender
+      userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== senderUserId);
+      console.log("Users to notify for intervention:", userIdsToNotify.length, userIdsToNotify);
     } else if (senderUserId) {
       // Default case: notify org members (legacy behavior)
       const { data: senderProfile } = await supabase
         .from("profiles")
         .select("invite_code_id, admin_id")
         .eq("user_id", senderUserId)
-        .single();
+        .maybeSingle();
 
       if (senderProfile) {
         const { data: adminCheck } = await supabase
@@ -289,28 +313,34 @@ serve(async (req) => {
           .select("role")
           .eq("user_id", senderUserId)
           .eq("role", "admin")
-          .single();
+          .maybeSingle();
 
-        let orgId: string | null = null;
+        let orgIds: string[] = [];
 
         if (adminCheck) {
-          const { data: inviteCode } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId).single();
-          orgId = inviteCode?.id || null;
-        } else {
-          orgId = senderProfile.invite_code_id;
+          const { data: inviteCodes } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId);
+          orgIds = (inviteCodes || []).map((ic) => ic.id);
+        } else if (senderProfile.invite_code_id) {
+          orgIds = [senderProfile.invite_code_id];
         }
 
-        if (orgId) {
-          const { data: orgMembers } = await supabase.from("profiles").select("user_id").eq("invite_code_id", orgId);
-          const { data: adminProfile } = await supabase.from("invite_codes").select("admin_id").eq("id", orgId).single();
+        if (orgIds.length > 0) {
+          const { data: orgMembers } = await supabase.from("profiles").select("user_id").in("invite_code_id", orgIds);
           const memberIds = (orgMembers || []).map((p) => p.user_id);
-          if (adminProfile?.admin_id) memberIds.push(adminProfile.admin_id);
+          
+          // Also add admins of these orgs
+          const { data: adminProfiles } = await supabase.from("invite_codes").select("admin_id").in("id", orgIds);
+          (adminProfiles || []).forEach((ap) => {
+            if (ap.admin_id) memberIds.push(ap.admin_id);
+          });
+          
           userIdsToNotify = [...new Set(memberIds)].filter((id) => id !== senderUserId);
         }
       }
     }
 
     if (userIdsToNotify.length === 0) {
+      console.log("No users to notify");
       return new Response(JSON.stringify({ message: "No users to notify", total: 0, successful: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -323,7 +353,7 @@ serve(async (req) => {
 
     if (subError) throw subError;
 
-    console.log(`Found ${subscriptions?.length || 0} subscriptions to notify`);
+    console.log(`Found ${subscriptions?.length || 0} subscriptions for ${userIdsToNotify.length} users to notify`);
 
     const vapidKeys = await importVapidKeyPairFromBase64Url(vapidPublicKey, vapidPrivateKey);
 
@@ -358,7 +388,7 @@ serve(async (req) => {
           return { success: true, userId: sub.user_id };
         } catch (err: unknown) {
           if (err instanceof webpush.PushMessageError) {
-            console.error("PushMessageError:", err.toString());
+            console.error("PushMessageError for user", sub.user_id, ":", err.toString());
             if (err.isGone()) {
               console.log("Removing invalid subscription:", sub.id);
               await supabase.from("push_subscriptions").delete().eq("id", sub.id);
@@ -367,7 +397,7 @@ serve(async (req) => {
           }
 
           const e = err as Error;
-          console.error("Push error:", e?.message || err);
+          console.error("Push error for user", sub.user_id, ":", e?.message || err);
           return { success: false, error: e?.message || "Unknown" };
         }
       }),
