@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  isPushSupported, 
-  getNotificationPermission, 
+import {
+  isPushSupported,
+  getNotificationPermission,
   subscribeToPush,
-  unsubscribeFromPush 
+  unsubscribeFromPush,
+  ensurePushSubscription,
 } from '@/services/pushNotifications';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -15,34 +16,53 @@ export const NotificationToggle = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [loading, setLoading] = useState(false);
   const [supported, setSupported] = useState(false);
-  
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
   const { user } = useAuth();
 
-  useEffect(() => {
+  const refreshState = useCallback(async () => {
     setSupported(isPushSupported());
-    setPermission(getNotificationPermission());
-  }, []);
+    const p = getNotificationPermission();
+    setPermission(p);
+
+    if (!user) {
+      setIsSubscribed(false);
+      return;
+    }
+
+    // If permission is granted, ensure the browser subscription exists AND is saved to DB.
+    if (p === 'granted') {
+      const ok = await ensurePushSubscription(user.id);
+      setIsSubscribed(ok);
+    } else {
+      setIsSubscribed(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void refreshState();
+  }, [refreshState]);
 
   const handleToggle = async () => {
     if (!user) return;
-    
+
     setLoading(true);
-    
+
     try {
-      if (permission === 'granted') {
-        // Unsubscribe
+      if (isSubscribed) {
         await unsubscribeFromPush(user.id);
         toast.success('Notifications désactivées');
-        setPermission('default');
+        setIsSubscribed(false);
+        setPermission(getNotificationPermission());
       } else {
-        // Subscribe
         const success = await subscribeToPush(user.id);
         if (success) {
           toast.success('Notifications activées !');
+          setIsSubscribed(true);
           setPermission('granted');
         } else {
-          // If the user granted permission but we still failed, it's usually setup/config.
           const current = getNotificationPermission();
+          setPermission(current);
           if (current === 'granted') {
             toast.error("Notifications non configurées sur cet appareil (clé VAPID manquante ou navigateur incompatible)");
           } else {
@@ -58,11 +78,9 @@ export const NotificationToggle = () => {
     }
   };
 
-  if (!supported) {
-    return null;
-  }
+  if (!supported) return null;
 
-  const isEnabled = permission === 'granted';
+  const isEnabled = isSubscribed && permission === 'granted';
 
   return (
     <Button
@@ -70,15 +88,12 @@ export const NotificationToggle = () => {
       size="icon"
       onClick={handleToggle}
       disabled={loading || permission === 'denied'}
-      className={cn(
-        "relative",
-        isEnabled && "text-primary"
-      )}
+      className={cn('relative', isEnabled && 'text-primary')}
       title={
-        permission === 'denied' 
+        permission === 'denied'
           ? 'Notifications bloquées dans les paramètres du navigateur'
-          : isEnabled 
-            ? 'Désactiver les notifications' 
+          : isEnabled
+            ? 'Désactiver les notifications'
             : 'Activer les notifications'
       }
     >
@@ -95,3 +110,4 @@ export const NotificationToggle = () => {
     </Button>
   );
 };
+
