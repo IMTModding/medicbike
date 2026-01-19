@@ -302,8 +302,16 @@ export const sendPushNotification = async (
   interventionId: string
 ): Promise<boolean> => {
   try {
-    const { error } = await supabase.functions.invoke('send-push-notification', {
-      body: { title, body, urgency, interventionId },
+    console.log('[Push] Sending intervention notification:', { title, urgency, interventionId });
+    
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: { 
+        title, 
+        body, 
+        urgency, 
+        interventionId,
+        type: 'intervention' // Explicit type for intervention notifications
+      },
     });
 
     if (error) {
@@ -311,7 +319,7 @@ export const sendPushNotification = async (
       return false;
     }
 
-    console.log('[Push] Push notification sent');
+    console.log('[Push] Push notification sent successfully:', data);
     return true;
   } catch (error) {
     console.error('[Push] Error sending push:', error);

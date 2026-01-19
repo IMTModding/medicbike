@@ -20,11 +20,13 @@ self.addEventListener("message", function (event) {
 });
 
 self.addEventListener("push", function (event) {
+  console.log("[SW] Push received");
+  
   var data = {
     title: "Nouvelle intervention",
     body: "Une nouvelle alerte a été créée",
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
+    icon: "/pwa-192x192.png",
+    badge: "/pwa-192x192.png",
     tag: "intervention",
     data: { url: "/" },
   };
@@ -32,39 +34,65 @@ self.addEventListener("push", function (event) {
   try {
     if (event.data) {
       var payload = event.data.json();
+      console.log("[SW] Push payload:", payload);
       data = Object.assign({}, data, payload);
     }
   } catch (e) {
-    // ignore
+    console.error("[SW] Error parsing push data:", e);
   }
 
   var options = {
     body: data.body,
-    icon: data.icon,
-    badge: data.badge,
-    tag: data.tag,
-    vibrate: [200, 100, 200],
-    requireInteraction: true,
-    data: data.data,
+    icon: data.icon || "/pwa-192x192.png",
+    badge: data.badge || "/pwa-192x192.png",
+    tag: data.tag || "default",
+    vibrate: [200, 100, 200, 100, 200],
+    requireInteraction: data.requireInteraction !== false,
+    data: data.data || { url: "/" },
+    actions: [
+      { action: "open", title: "Ouvrir" },
+      { action: "close", title: "Fermer" }
+    ]
   };
 
+  console.log("[SW] Showing notification:", data.title);
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener("notificationclick", function (event) {
+  console.log("[SW] Notification clicked:", event.action);
   event.notification.close();
 
-  var url = (event.notification.data && event.notification.data.url) || "/";
+  if (event.action === "close") {
+    return;
+  }
+
+  var url = "/";
+  if (event.notification.data) {
+    url = event.notification.data.url || "/";
+    // If it's an intervention, go to home to see it
+    if (event.notification.data.interventionId) {
+      url = "/";
+    }
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      // Check if any window is already open
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
         if (client.url.includes(self.location.origin) && "focus" in client) {
-          return client.focus();
+          client.focus();
+          if (client.navigate) {
+            return client.navigate(url);
+          }
+          return;
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
+      // No window open, open a new one
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
     })
   );
 });

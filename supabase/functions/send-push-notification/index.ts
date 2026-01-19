@@ -215,21 +215,68 @@ serve(async (req) => {
     let userIdsToNotify: string[] = [];
 
     if (type === "login" && organizationId && employeeUserId) {
+      // Login notification: notify admin only
       const { data: inviteCode } = await supabase.from("invite_codes").select("admin_id").eq("id", organizationId).single();
       if (inviteCode?.admin_id) userIdsToNotify = [inviteCode.admin_id];
     } else if (type === "news" && senderUserId) {
+      // News notification: notify all org members
       const { data: inviteCode } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId).single();
       if (inviteCode?.id) {
         const { data: orgMembers } = await supabase.from("profiles").select("user_id").eq("invite_code_id", inviteCode.id);
         userIdsToNotify = (orgMembers || []).map((p) => p.user_id);
       }
     } else if (type === "chat" && organizationId) {
+      // Chat notification: notify all org members except sender
       const { data: orgProfiles } = await supabase
         .from("profiles")
         .select("user_id")
         .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
       userIdsToNotify = (orgProfiles || []).map((p) => p.user_id).filter((id) => id !== excludeUserId);
+    } else if (type === "intervention" && senderUserId) {
+      // Intervention notification: notify ALL members of the sender's organization (except sender)
+      console.log("Processing intervention notification for sender:", senderUserId);
+      
+      // Check if sender is admin
+      const { data: adminCheck } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", senderUserId)
+        .eq("role", "admin")
+        .single();
+
+      let orgId: string | null = null;
+
+      if (adminCheck) {
+        // Sender is admin - get their org ID
+        const { data: inviteCode } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId).single();
+        orgId = inviteCode?.id || null;
+        console.log("Sender is admin, org ID:", orgId);
+      } else {
+        // Sender is employee - get their org ID from profile
+        const { data: senderProfile } = await supabase
+          .from("profiles")
+          .select("invite_code_id")
+          .eq("user_id", senderUserId)
+          .single();
+        orgId = senderProfile?.invite_code_id || null;
+        console.log("Sender is employee, org ID:", orgId);
+      }
+
+      if (orgId) {
+        // Get all org members
+        const { data: orgMembers } = await supabase.from("profiles").select("user_id").eq("invite_code_id", orgId);
+        // Get admin of the org
+        const { data: adminProfile } = await supabase.from("invite_codes").select("admin_id").eq("id", orgId).single();
+        
+        const memberIds = (orgMembers || []).map((p) => p.user_id);
+        if (adminProfile?.admin_id) memberIds.push(adminProfile.admin_id);
+        
+        // Remove duplicates and exclude sender
+        userIdsToNotify = [...new Set(memberIds)].filter((id) => id !== senderUserId);
+        console.log("Users to notify for intervention:", userIdsToNotify.length);
+      }
     } else if (senderUserId) {
+      // Default case: notify org members (legacy behavior)
       const { data: senderProfile } = await supabase
         .from("profiles")
         .select("invite_code_id, admin_id")
