@@ -59,7 +59,38 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
-    console.log('[Push] Service Worker registered:', registration.scope);
+
+    // Important for Push: ensure the newest SW becomes active.
+    // If a SW is left in "waiting", push events may not be handled by the code the user expects.
+    const trySkipWaiting = (reg: ServiceWorkerRegistration) => {
+      if (reg.waiting) {
+        console.log('[Push] SW is waiting -> sending SKIP_WAITING');
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    };
+
+    trySkipWaiting(registration);
+
+    if (registration.installing) {
+      registration.installing.addEventListener('statechange', () => {
+        if (registration.waiting) trySkipWaiting(registration);
+      });
+    }
+
+    // Ask the browser to check for an updated SW script.
+    // (No caching logic inside sw.js, so this is safe.)
+    try {
+      await registration.update();
+    } catch {
+      // ignore
+    }
+
+    // Wait until an active SW is ready
+    await navigator.serviceWorker.ready;
+
+    const activeUrl = (await navigator.serviceWorker.getRegistration())?.active?.scriptURL;
+    console.log('[Push] Service Worker registered:', registration.scope, 'active:', activeUrl);
+
     return registration;
   } catch (error) {
     console.error('[Push] Service Worker registration failed:', error);
