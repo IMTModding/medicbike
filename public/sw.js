@@ -25,8 +25,8 @@ self.addEventListener("push", function (event) {
   var data = {
     title: "Nouvelle intervention",
     body: "Une nouvelle alerte a été créée",
-    icon: "/pwa-192x192.png",
-    badge: "/pwa-192x192.png",
+    icon: "/logo.jpg",
+    badge: "/notification-badge.png",
     tag: "intervention",
     data: { url: "/" },
   };
@@ -43,8 +43,8 @@ self.addEventListener("push", function (event) {
 
   var options = {
     body: data.body,
-    icon: data.icon || "/pwa-192x192.png",
-    badge: data.badge || "/pwa-192x192.png",
+    icon: data.icon || "/logo.jpg",
+    badge: data.badge || "/notification-badge.png",
     tag: data.tag || "default",
     vibrate: [200, 100, 200, 100, 200],
     requireInteraction: data.requireInteraction !== false,
