@@ -98,8 +98,7 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
     const vapidPublicKey = await getVapidPublicKey();
 
     if (!subscription && vapidPublicKey) {
-      // Create new subscription
-      // NOTE: PushManager.subscribe expects a Uint8Array for applicationServerKey
+      // Create new subscription with VAPID key
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -112,35 +111,84 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
       console.warn('VAPID public key missing; cannot subscribe to push');
     }
 
-    if (subscription) {
-      // Save subscription to database
-      const subscriptionJson = subscription.toJSON();
-      
-      const { error } = await supabase
-        .from('push_subscriptions')
-        .upsert({
+    if (!subscription) return false;
+
+    // Save subscription to database
+    const subscriptionJson = subscription.toJSON();
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(
+        {
           user_id: userId,
           endpoint: subscription.endpoint,
           p256dh: subscriptionJson.keys?.p256dh || '',
           auth: subscriptionJson.keys?.auth || '',
-        }, {
+        },
+        {
           onConflict: 'user_id,endpoint',
-        });
+        }
+      );
 
-      if (error) {
-        console.error('Error saving subscription:', error);
-        return false;
-      }
-
-      console.log('Subscription saved to database');
-      return true;
+    if (error) {
+      console.error('Error saving subscription:', error);
+      return false;
     }
 
-    return false;
+    console.log('Subscription saved to database');
+    return true;
   } catch (error) {
     console.error('Error subscribing to push:', error);
     return false;
   }
+};
+
+export const getCurrentPushSubscription = async (): Promise<PushSubscription | null> => {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    return await registration.pushManager.getSubscription();
+  } catch (error) {
+    console.error('Error getting push subscription:', error);
+    return null;
+  }
+};
+
+/**
+ * Ensures the device is subscribed and the subscription is persisted in DB.
+ * Useful after page reloads when Notification.permission is still "granted".
+ */
+export const ensurePushSubscription = async (userId: string): Promise<boolean> => {
+  const permission = getNotificationPermission();
+  if (permission !== 'granted') return false;
+
+  const existing = await getCurrentPushSubscription();
+  // If a subscription exists in the browser, just persist it again to DB.
+  if (existing) {
+    try {
+      const json = existing.toJSON();
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert(
+          {
+            user_id: userId,
+            endpoint: existing.endpoint,
+            p256dh: json.keys?.p256dh || '',
+            auth: json.keys?.auth || '',
+          },
+          { onConflict: 'user_id,endpoint' }
+        );
+      if (error) {
+        console.error('Error re-saving subscription:', error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Error re-saving subscription:', e);
+      return false;
+    }
+  }
+
+  // Otherwise, create a new subscription.
+  return await subscribeToPush(userId);
 };
 
 export const unsubscribeFromPush = async (userId: string): Promise<boolean> => {
