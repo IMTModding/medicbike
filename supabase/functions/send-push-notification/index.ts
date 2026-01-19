@@ -160,24 +160,32 @@ serve(async (req) => {
     // If not a webhook call, require authentication
     if (!senderUserId) {
       const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
+      if (!authHeader?.startsWith('Bearer ')) {
         return new Response(
           JSON.stringify({ error: 'Authentication required' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      // Create client with user's auth for getClaims
+      const supabaseWithAuth = createClient(
+        supabaseUrl,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
       
-      if (authError || !user) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: claimsData, error: claimsError } = await supabaseWithAuth.auth.getClaims(token);
+      
+      if (claimsError || !claimsData?.claims) {
+        console.error('Invalid token:', claimsError);
         return new Response(
           JSON.stringify({ error: 'Invalid authentication' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      senderUserId = user.id;
+      senderUserId = claimsData.claims.sub as string;
     }
     
     console.log('Sending push notification:', { title, type, urgency, interventionId, organizationId, newsId, senderUserId });
