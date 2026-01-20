@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { isNativeApp, startBackgroundTracking, stopBackgroundTracking } from '@/services/backgroundLocation';
 
 interface AlertCardProps {
   intervention: Intervention;
@@ -298,6 +299,10 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
+      // Also cleanup native background tracking if active
+      if (isNativeApp()) {
+        stopBackgroundTracking();
+      }
     };
   }, []);
 
@@ -305,17 +310,41 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
     setIsDeparting(true);
     
     try {
-      // Start GPS tracking
-      const gpsStarted = await startGpsTracking();
+      let gpsStarted = false;
       
-      if (gpsStarted) {
-        toast.success('🚗 Départ signalé - GPS activé');
+      // Try native background tracking first (works when app is closed)
+      if (isNativeApp() && intervention.latitude && intervention.longitude) {
+        const watcherId = await startBackgroundTracking(
+          user!.id,
+          intervention.id,
+          intervention.title,
+          intervention.latitude,
+          intervention.longitude,
+          () => {
+            setHasArrived(true);
+            toast.success('🎯 Vous êtes arrivé sur les lieux !');
+          }
+        );
         
-        // Send departure notification
-        await sendStatusNotification('departure', intervention.id, intervention.title);
-      } else {
-        toast.warning('Départ signalé sans GPS');
+        if (watcherId) {
+          gpsStarted = true;
+          toast.success('🚗 Départ signalé - Suivi GPS en arrière-plan activé');
+        }
       }
+      
+      // Fallback to web GPS tracking (only works when app is open)
+      if (!gpsStarted) {
+        gpsStarted = await startGpsTracking();
+        
+        if (gpsStarted) {
+          toast.success('🚗 Départ signalé - GPS activé');
+        } else {
+          toast.warning('Départ signalé sans GPS');
+        }
+      }
+      
+      // Send departure notification
+      await sendStatusNotification('departure', intervention.id, intervention.title);
       
       // Mark as available (departed)
       onStatusChange(intervention.id, 'available');
