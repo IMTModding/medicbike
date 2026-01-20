@@ -403,13 +403,16 @@ const EmployeesPage = () => {
             filteredEmployees.map((employee) => {
               const status = getEmployeeStatus(employee.user_id);
               const isEmployeeAdmin = employee.role === 'admin';
+              const isEmployeeCreator = employee.role === 'creator';
+              const hasAdminPrivileges = isEmployeeAdmin || isEmployeeCreator;
               
               return (
                 <Card
                   key={employee.id}
                   className={cn(
                     "bg-card border-border",
-                    isEmployeeAdmin && "border-admin/50 bg-admin/5"
+                    isEmployeeCreator && "border-creator/50 bg-creator/5",
+                    isEmployeeAdmin && !isEmployeeCreator && "border-admin/50 bg-admin/5"
                   )}
                 >
                   <CardContent className="py-4">
@@ -418,7 +421,9 @@ const EmployeesPage = () => {
                       <div
                         className={cn(
                           "w-10 h-10 rounded-full flex items-center justify-center overflow-hidden mr-3 flex-shrink-0",
-                          isEmployeeAdmin
+                          isEmployeeCreator
+                            ? "bg-gradient-to-br from-creator to-creator-strong"
+                            : isEmployeeAdmin
                             ? "bg-gradient-to-br from-admin to-admin-strong"
                             : "bg-gradient-to-br from-primary to-warning"
                         )}
@@ -446,12 +451,17 @@ const EmployeesPage = () => {
                           <h3
                             className={cn(
                               "font-semibold truncate",
-                              isEmployeeAdmin ? "text-admin" : "text-foreground"
+                              isEmployeeCreator ? "text-creator" : isEmployeeAdmin ? "text-admin" : "text-foreground"
                             )}
                           >
                             {employee.full_name || 'Sans nom'}
                           </h3>
-                          {isEmployeeAdmin && (
+                          {isEmployeeCreator && (
+                            <Badge className="bg-creator text-creator-foreground text-xs">
+                              Créateur
+                            </Badge>
+                          )}
+                          {isEmployeeAdmin && !isEmployeeCreator && (
                             <Badge className="bg-admin text-admin-foreground text-xs">
                               Admin
                             </Badge>
@@ -517,41 +527,43 @@ const EmployeesPage = () => {
                             </Button>
                           </>
                         )}
-                        {/* Role dropdown */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1 text-muted-foreground hover:text-foreground"
-                              disabled={updatingRoleId === employee.user_id || employee.user_id === user?.id}
-                              title="Changer le rôle"
-                            >
-                              <Shield className="w-4 h-4" />
-                              <ChevronDown className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleChangeRole(employee.user_id, 'admin')}
-                              disabled={isEmployeeAdmin}
-                              className={cn(isEmployeeAdmin && "opacity-50")}
-                            >
-                              <Shield className="w-4 h-4 mr-2 text-admin" />
-                              Administrateur
-                              {isEmployeeAdmin && " ✓"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleChangeRole(employee.user_id, 'employee')}
-                              disabled={!isEmployeeAdmin}
-                              className={cn(!isEmployeeAdmin && "opacity-50")}
-                            >
-                              <User className="w-4 h-4 mr-2" />
-                              Employé
-                              {!isEmployeeAdmin && " ✓"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {/* Role dropdown - disabled for creators */}
+                        {!isEmployeeCreator && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1 text-muted-foreground hover:text-foreground"
+                                disabled={updatingRoleId === employee.user_id || employee.user_id === user?.id}
+                                title="Changer le rôle"
+                              >
+                                <Shield className="w-4 h-4" />
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleChangeRole(employee.user_id, 'admin')}
+                                disabled={isEmployeeAdmin}
+                                className={cn(isEmployeeAdmin && "opacity-50")}
+                              >
+                                <Shield className="w-4 h-4 mr-2 text-admin" />
+                                Administrateur
+                                {isEmployeeAdmin && " ✓"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleChangeRole(employee.user_id, 'employee')}
+                                disabled={!hasAdminPrivileges}
+                                className={cn(!hasAdminPrivileges && "opacity-50")}
+                              >
+                                <User className="w-4 h-4 mr-2" />
+                                Employé
+                                {!hasAdminPrivileges && " ✓"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"

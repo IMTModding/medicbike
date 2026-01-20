@@ -5,7 +5,7 @@ import { recordLogin } from '@/hooks/useLoginHistory';
 import { sendLoginNotification } from '@/services/loginNotifications';
 import logo from '@/assets/logo.jpg';
 
-type UserRole = 'admin' | 'employee';
+type UserRole = 'creator' | 'admin' | 'employee';
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +13,7 @@ interface AuthContextType {
   loading: boolean;
   role: UserRole | null;
   isAdmin: boolean;
+  isCreator: boolean;
   signUp: (email: string, password: string, fullName: string, phone: string, inviteCode: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -186,7 +187,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRole(null);
   };
 
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'creator';
+  const isCreator = role === 'creator';
 
   // Block rendering until auth is initialized to prevent infinite loops
   if (loading) {
@@ -214,7 +216,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role, isAdmin, signUp, signIn, signOut, validateInviteCode }}>
+    <AuthContext.Provider value={{ user, session, loading, role, isAdmin, isCreator, signUp, signIn, signOut, validateInviteCode }}>
       {children}
     </AuthContext.Provider>
   );

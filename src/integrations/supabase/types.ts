@@ -562,6 +562,7 @@ export type Database = {
           accessible_user_id: string
         }[]
       }
+      has_admin_privileges: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -569,6 +570,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_creator: { Args: { _user_id: string }; Returns: boolean }
       validate_invite_code: {
         Args: { code_to_validate: string }
         Returns: {
@@ -580,7 +582,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "employee"
+      app_role: "admin" | "employee" | "creator"
       intervention_status: "active" | "completed"
       response_status: "pending" | "available" | "unavailable"
       urgency_level: "high" | "medium" | "low"
@@ -711,7 +713,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee"],
+      app_role: ["admin", "employee", "creator"],
       intervention_status: ["active", "completed"],
       response_status: ["pending", "available", "unavailable"],
       urgency_level: ["high", "medium", "low"],
