@@ -74,7 +74,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   
-  const { user, loading: authLoading, role } = useAuth();
+  const { user, loading: authLoading, role, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const loadData = useCallback(async () => {
@@ -100,14 +100,14 @@ const AdminDashboard = () => {
     // Wait for role to be loaded before enforcing admin-only access
     if (role === null) return;
 
-    if (role !== 'admin') {
+    if (!isAdmin) {
       navigate('/');
       toast.error('Accès réservé aux administrateurs');
     }
-  }, [user, authLoading, role, navigate]);
+  }, [user, authLoading, role, isAdmin, navigate]);
 
   useEffect(() => {
-    if (user && role === 'admin') {
+    if (user && isAdmin) {
       loadData();
       
       const intChannel = subscribeToInterventions(() => loadData());
@@ -118,7 +118,7 @@ const AdminDashboard = () => {
         respChannel.unsubscribe();
       };
     }
-  }, [user, role, loadData]);
+  }, [user, isAdmin, loadData]);
 
   const handleComplete = async (id: string) => {
     setActionLoading(id);
@@ -156,7 +156,7 @@ const AdminDashboard = () => {
     );
   }
 
-  if (!user || role !== 'admin') {
+  if (!user || !isAdmin) {
     return null;
   }
 

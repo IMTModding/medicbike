@@ -54,7 +54,7 @@ interface Availability {
 }
 
 const EmployeesPage = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isCreator, role, loading } = useAuth();
   const { isUserOnline, getUserPresence } = usePresence();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -67,19 +67,25 @@ const EmployeesPage = () => {
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       navigate('/auth');
-    } else if (!loading && !isAdmin) {
+      return;
+    }
+    // Wait for role to be loaded before enforcing access
+    if (role === null) return;
+    if (!isAdmin) {
       navigate('/');
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, isCreator, role, loading, navigate]);
 
   useEffect(() => {
-    if (user && isAdmin) {
+    if (loading) return;
+    if (user && (isAdmin || isCreator)) {
       fetchEmployees();
       fetchTodayAvailabilities();
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, isCreator, loading]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -123,11 +129,16 @@ const EmployeesPage = () => {
 
     setLoadingEmployees(true);
 
-    // First, get all invite codes created by this admin
-    const { data: codes, error: codesError } = await supabase
+    // First, get invite codes.
+    // - Admin: only their own codes
+    // - Creator: all codes (global view)
+    const codesQuery = supabase
       .from('invite_codes')
-      .select('id, organization_name')
-      .eq('admin_id', user.id);
+      .select('id, organization_name');
+
+    const { data: codes, error: codesError } = isCreator
+      ? await codesQuery
+      : await codesQuery.eq('admin_id', user.id);
 
     if (codesError) {
       console.error('Error fetching codes:', codesError);
@@ -135,14 +146,16 @@ const EmployeesPage = () => {
       return;
     }
 
-    if (!codes || codes.length === 0) {
+    // If admin has no codes, they have no organization yet.
+    // For creator, we still continue (they can see users even if there are no codes).
+    if (!isCreator && (!codes || codes.length === 0)) {
       setEmployees([]);
       setFilteredEmployees([]);
       setLoadingEmployees(false);
       return;
     }
 
-    const codeMap = new Map(codes.map((c) => [c.id, c.organization_name]));
+    const codeMap = new Map((codes || []).map((c) => [c.id, c.organization_name]));
 
     // Use secure function to fetch profiles with proper phone visibility
     const { data: profiles, error: profilesError } = await supabase

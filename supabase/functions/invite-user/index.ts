@@ -56,14 +56,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if user is admin
+    // Check if user is admin or creator
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
       .single();
 
-    if (roleError || roleData?.role !== "admin") {
+    const isCreator = roleData?.role === "creator";
+    const isAdmin = roleData?.role === "admin" || isCreator;
+
+    if (roleError || !isAdmin) {
       console.error("User is not admin:", roleError);
       return new Response(
         JSON.stringify({ error: "Seuls les administrateurs peuvent inviter des utilisateurs" }),
