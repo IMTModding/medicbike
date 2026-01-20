@@ -134,7 +134,7 @@ const Index = () => {
       {/* Onboarding */}
       <Onboarding open={showOnboarding} onComplete={completeOnboarding} />
       
-      <main className="container px-4 py-6 pb-24">
+      <main className="container px-4 py-6 pb-28 safe-bottom">
         {/* Offline Banner */}
         {!isOnline && (
           <OfflineBanner 

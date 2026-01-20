@@ -2,19 +2,38 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
     <link rel="icon" href="/logo.jpg" type="image/jpeg">
     <title>MEDICBIKE</title>
     <meta name="description" content="Application de gestion des interventions pour motos médicalisées" />
     <meta name="author" content="Lovable" />
     
+    <!-- Mobile Compatibility -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="HandheldFriendly" content="true" />
+    
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#1e3a5f" />
+    <meta name="theme-color" content="#1e3a5f" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1a2b" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MEDICBIKE" />
     <link rel="apple-touch-icon" href="/logo.jpg" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/pwa-192x192.png" />
     
+    <!-- iOS Splash Screens -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    
+    <!-- Android Chrome -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Microsoft -->
+    <meta name="msapplication-TileColor" content="#1e3a5f" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
     <!-- Open Graph -->
     <meta property="og:title" content="MEDICBIKE" />
     <meta property="og:description" content="Application de gestion des interventions pour motos médicalisées" />
@@ -35,7 +54,7 @@
       <style>
         html, body { height: 100%; margin: 0; }
         body { background: #0b1a2b; color: #ffffff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-        #boot-loader { min-height: 100vh; display: grid; place-items: center; padding: 24px; text-align: center; }
+        #boot-loader { min-height: 100vh; display: grid; place-items: center; padding: 24px; text-align: center; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
         #boot-loader .card { max-width: 520px; width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; padding: 20px; }
         #boot-loader .title { font-weight: 800; letter-spacing: 0.02em; margin: 0 0 8px; }
         #boot-loader .muted { opacity: 0.85; margin: 0; }
@@ -45,9 +64,9 @@
         <div class="card">
           <h1 class="title">MEDICBIKE</h1>
           <p class="muted">Chargement en cours…</p>
-          <p class="hint">Si l’écran reste bloqué, essayez un rafraîchissement complet ou videz les données du site (cache). Ensuite, relancez depuis le navigateur.</p>
+          <p class="hint">Si l'écran reste bloqué, essayez un rafraîchissement complet ou videz les données du site (cache). Ensuite, relancez depuis le navigateur.</p>
           <noscript>
-            <p class="hint">JavaScript est désactivé : l’application ne peut pas démarrer.</p>
+            <p class="hint">JavaScript est désactivé : l'application ne peut pas démarrer.</p>
           </noscript>
         </div>
       </div>
