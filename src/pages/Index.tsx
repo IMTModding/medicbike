@@ -174,9 +174,7 @@ const Index = () => {
           </div>
         )}
 
-        {/* Availability Calendar */}
-        <AvailabilityCalendar />
-
+        {/* Intervention Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-card rounded-xl p-3 border border-border">
             <div className="flex items-center gap-2 mb-1">
@@ -212,7 +210,7 @@ const Index = () => {
         </div>
 
         {/* Alerts List */}
-        <div className="space-y-4">
+        <div className="space-y-4 mb-6">
           {sortedInterventions.map(intervention => (
             <AlertCard
               key={intervention.id}
@@ -223,9 +221,9 @@ const Index = () => {
           ))}
         </div>
 
-        {/* Empty State */}
+        {/* Empty State for Interventions */}
         {displayedInterventions.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center py-8 text-center mb-6">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -235,6 +233,10 @@ const Index = () => {
             </p>
           </div>
         )}
+
+        {/* Availability Calendar */}
+        <AvailabilityCalendar />
+
       </main>
 
       {/* Admin: Create Alert Button */}
