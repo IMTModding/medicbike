@@ -18,8 +18,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus, KeyRound, Mail } from 'lucide-react';
+import { Users, Search, Trash2, Building2, Calendar, UserX, Circle, Clock, User, Phone, MessageSquare, UserPlus, KeyRound, Mail, Shield, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -58,6 +64,7 @@ const EmployeesPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [todayAvailabilities, setTodayAvailabilities] = useState<Map<string, Availability>>(new Map());
   const [resetPasswordEmployee, setResetPasswordEmployee] = useState<Employee | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -190,6 +197,32 @@ const EmployeesPage = () => {
       toast.error(error.message || 'Erreur lors de la suppression');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleChangeRole = async (userId: string, newRole: 'admin' | 'employee') => {
+    setUpdatingRoleId(userId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('update-user-role', {
+        body: { userId, newRole },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success(`Rôle mis à jour : ${newRole === 'admin' ? 'Administrateur' : 'Employé'}`);
+      fetchEmployees();
+    } catch (error: any) {
+      console.error('Error changing role:', error);
+      toast.error(error.message || 'Erreur lors du changement de rôle');
+    } finally {
+      setUpdatingRoleId(null);
     }
   };
 
@@ -484,6 +517,41 @@ const EmployeesPage = () => {
                             </Button>
                           </>
                         )}
+                        {/* Role dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-muted-foreground hover:text-foreground"
+                              disabled={updatingRoleId === employee.user_id || employee.user_id === user?.id}
+                              title="Changer le rôle"
+                            >
+                              <Shield className="w-4 h-4" />
+                              <ChevronDown className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleChangeRole(employee.user_id, 'admin')}
+                              disabled={isEmployeeAdmin}
+                              className={cn(isEmployeeAdmin && "opacity-50")}
+                            >
+                              <Shield className="w-4 h-4 mr-2 text-admin" />
+                              Administrateur
+                              {isEmployeeAdmin && " ✓"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleChangeRole(employee.user_id, 'employee')}
+                              disabled={!isEmployeeAdmin}
+                              className={cn(!isEmployeeAdmin && "opacity-50")}
+                            >
+                              <User className="w-4 h-4 mr-2" />
+                              Employé
+                              {!isEmployeeAdmin && " ✓"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                           variant="ghost"
                           size="icon"
