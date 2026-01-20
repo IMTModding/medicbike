@@ -46,7 +46,7 @@ serve(async (req) => {
       );
     }
 
-    // Get all employees with phone numbers from the same organization
+    // Get intervention to find the creator
     const { data: intervention } = await supabase
       .from("interventions")
       .select("created_by")
@@ -64,23 +64,49 @@ serve(async (req) => {
       .eq("user_id", intervention.created_by)
       .single();
 
-    // Build query for team members
-    let profilesQuery = supabase
-      .from("profiles")
-      .select("phone, full_name")
+    // Get organization member user_ids first
+    let memberUserIds: string[] = [];
+    
+    if (creatorProfile?.invite_code_id) {
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("invite_code_id", creatorProfile.invite_code_id);
+      memberUserIds = members?.map(m => m.user_id) || [];
+    } else if (creatorProfile?.admin_id) {
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("admin_id", creatorProfile.admin_id);
+      memberUserIds = members?.map(m => m.user_id) || [];
+    }
+
+    if (memberUserIds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, message: "Aucun membre trouvé", sentCount: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get phone numbers from profile_contacts table (not profiles)
+    const { data: contacts, error: contactsError } = await supabase
+      .from("profile_contacts")
+      .select("phone, user_id")
+      .in("user_id", memberUserIds)
       .not("phone", "is", null);
 
-    if (creatorProfile?.invite_code_id) {
-      profilesQuery = profilesQuery.eq("invite_code_id", creatorProfile.invite_code_id);
-    } else if (creatorProfile?.admin_id) {
-      profilesQuery = profilesQuery.eq("admin_id", creatorProfile.admin_id);
+    if (contactsError) {
+      throw contactsError;
     }
 
-    const { data: profiles, error: profilesError } = await profilesQuery;
+    // Get full names for the contacts
+    const contactUserIds = contacts?.map(c => c.user_id) || [];
+    const { data: profileNames } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", contactUserIds);
 
-    if (profilesError) {
-      throw profilesError;
-    }
+    const nameMap = new Map(profileNames?.map(p => [p.user_id, p.full_name]) || []);
 
     const urgencyLabel = urgency === "high" ? "🚨 URGENT" : urgency === "medium" ? "⚠️ Moyen" : "ℹ️ Normal";
     const message = `${urgencyLabel}\n\nNouvelle intervention MedicBike:\n📍 ${location}\n📋 ${title}\n\nConnectez-vous à l'app pour répondre.`;
@@ -88,18 +114,20 @@ serve(async (req) => {
     let sentCount = 0;
     const errors: string[] = [];
 
-    // Send SMS to each team member
-    for (const profile of profiles || []) {
-      if (!profile.phone) continue;
+    // Send SMS to each team member with a phone number
+    for (const contact of contacts || []) {
+      if (!contact.phone) continue;
 
       // Clean phone number (ensure it has country code)
-      let phoneNumber = profile.phone.replace(/\s+/g, "");
+      let phoneNumber = contact.phone.replace(/\s+/g, "");
       if (!phoneNumber.startsWith("+")) {
         // Assume French number if no country code
         phoneNumber = phoneNumber.startsWith("0") 
           ? "+33" + phoneNumber.substring(1) 
           : "+33" + phoneNumber;
       }
+
+      const fullName = nameMap.get(contact.user_id) || phoneNumber;
 
       try {
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
@@ -120,7 +148,7 @@ serve(async (req) => {
 
         if (response.ok) {
           sentCount++;
-          console.log(`SMS sent to ${profile.full_name || phoneNumber}`);
+          console.log(`SMS sent to ${fullName}`);
         } else {
           const errorData = await response.json();
           errors.push(`${phoneNumber}: ${errorData.message || "Erreur inconnue"}`);
@@ -137,7 +165,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         sentCount,
-        totalRecipients: profiles?.length || 0,
+        totalRecipients: contacts?.length || 0,
         errors: errors.length > 0 ? errors : undefined
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
