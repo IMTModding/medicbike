@@ -36,8 +36,8 @@ const App = () => {
           <Toaster />
           <Sonner />
           <PWAUpdateBanner />
-          <CookieConsentBanner />
           <BrowserRouter>
+            <CookieConsentBanner />
             <PresenceProvider>
               <RealtimeNotificationProvider>
                 <Routes>
