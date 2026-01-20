@@ -68,6 +68,33 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
+// Save event to database
+const saveInterventionEvent = async (
+  interventionId: string,
+  userId: string,
+  eventType: 'departure' | 'arrival',
+  latitude?: number,
+  longitude?: number
+) => {
+  try {
+    const { error } = await supabase
+      .from('intervention_events')
+      .insert({
+        intervention_id: interventionId,
+        user_id: userId,
+        event_type: eventType,
+        latitude,
+        longitude,
+      });
+    
+    if (error) {
+      console.error('Error saving intervention event:', error);
+    }
+  } catch (err) {
+    console.error('Failed to save intervention event:', err);
+  }
+};
+
 // Send departure/arrival notification
 const sendStatusNotification = async (
   type: 'departure' | 'arrival',
@@ -151,14 +178,25 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
         async (position) => {
           console.log('GPS position obtained:', position.coords);
           
+          const { latitude, longitude, accuracy } = position.coords;
+          
+          // Save departure event to database
+          await saveInterventionEvent(
+            intervention.id,
+            user.id,
+            'departure',
+            latitude,
+            longitude
+          );
+          
           // Save initial position
           const { error: dbError } = await supabase
             .from('user_locations')
             .upsert({
               user_id: user.id,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
+              latitude,
+              longitude,
+              accuracy,
               updated_at: new Date().toISOString(),
               is_active: true
             }, {
@@ -197,6 +235,15 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
               if (!arrivalNotifiedRef.current && checkArrival(latitude, longitude)) {
                 arrivalNotifiedRef.current = true;
                 setHasArrived(true);
+                
+                // Save arrival event to database
+                await saveInterventionEvent(
+                  intervention.id,
+                  user.id,
+                  'arrival',
+                  latitude,
+                  longitude
+                );
                 
                 // Send arrival notification
                 await sendStatusNotification('arrival', intervention.id, intervention.title);

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useHistoryInterventions } from '@/hooks/useInterventions';
+import { useHistoryInterventions, useInterventionEvents } from '@/hooks/useInterventions';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   ArrowLeft, 
@@ -17,7 +17,9 @@ import {
   X,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  Car,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +85,12 @@ const HistoryPage = () => {
     isLoading: loading,
     refetch,
   } = useHistoryInterventions(appliedStartDate, appliedEndDate);
+
+  // Get intervention IDs for events query
+  const interventionIds = useMemo(() => interventions.map(i => i.id), [interventions]);
+  
+  // Fetch events for all interventions
+  const { data: eventsMap = {} } = useInterventionEvents(interventionIds);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -538,6 +546,42 @@ const HistoryPage = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Departure/Arrival Events */}
+                {eventsMap[intervention.id] && eventsMap[intervention.id].length > 0 && (
+                  <div className="mt-3 bg-primary/5 rounded-lg p-3 border border-primary/20">
+                    <h4 className="text-xs font-medium text-primary mb-2 flex items-center gap-1.5">
+                      <Car className="w-3.5 h-3.5" />
+                      Chronologie des déplacements
+                    </h4>
+                    <div className="space-y-1.5">
+                      {eventsMap[intervention.id].map(event => (
+                        <div 
+                          key={event.id}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          {event.event_type === 'departure' ? (
+                            <Car className="w-3 h-3 text-warning" />
+                          ) : (
+                            <Target className="w-3 h-3 text-success" />
+                          )}
+                          <span className={cn(
+                            "font-medium",
+                            event.event_type === 'departure' ? "text-warning" : "text-success"
+                          )}>
+                            {event.event_type === 'departure' ? 'Départ' : 'Arrivée'}
+                          </span>
+                          <span className="text-foreground">
+                            {event.profile?.full_name || 'Utilisateur'}
+                          </span>
+                          <span className="text-muted-foreground ml-auto">
+                            {format(new Date(event.created_at), 'HH:mm', { locale: fr })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

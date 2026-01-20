@@ -112,6 +112,44 @@ export type Database = {
           },
         ]
       }
+      intervention_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          intervention_id: string
+          latitude: number | null
+          longitude: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          intervention_id: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          intervention_id?: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_events_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "interventions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intervention_messages: {
         Row: {
           created_at: string
