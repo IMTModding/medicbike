@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { PresenceProvider } from "@/contexts/PresenceContext";
 import { RealtimeNotificationProvider } from "@/components/RealtimeNotificationProvider";
 import { PWAUpdateBanner } from "@/components/PWAUpdateBanner";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -21,6 +22,8 @@ import GeneralChatPage from "./pages/GeneralChatPage";
 import ResetPassword from "./pages/ResetPassword";
 import NewsPage from "./pages/NewsPage";
 import SettingsPage from "./pages/SettingsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TechnicalDocsPage from "./pages/TechnicalDocsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +36,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <PWAUpdateBanner />
+          <CookieConsentBanner />
           <BrowserRouter>
             <PresenceProvider>
               <RealtimeNotificationProvider>
@@ -41,7 +45,6 @@ const App = () => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/history" element={<HistoryPage />} />
-                  
                   <Route path="/stats" element={<StatsPage />} />
                   <Route path="/availability" element={<AvailabilityPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
@@ -52,6 +55,8 @@ const App = () => {
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/news" element={<NewsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/docs" element={<TechnicalDocsPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
