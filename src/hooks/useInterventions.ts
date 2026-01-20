@@ -133,6 +133,66 @@ export const useCreateIntervention = () => {
   });
 };
 
+// Intervention event type
+export interface InterventionEvent {
+  id: string;
+  intervention_id: string;
+  user_id: string;
+  event_type: 'departure' | 'arrival';
+  created_at: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  profile?: {
+    full_name: string | null;
+  };
+}
+
+// Fetch intervention events for history
+export const useInterventionEvents = (interventionIds: string[]) => {
+  return useQuery({
+    queryKey: ['intervention_events', interventionIds],
+    queryFn: async () => {
+      if (interventionIds.length === 0) return {};
+      
+      const { data: events, error } = await supabase
+        .from('intervention_events')
+        .select('*')
+        .in('intervention_id', interventionIds)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Fetch profiles for events
+      const userIds = [...new Set((events || []).map(e => e.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+
+      // Group events by intervention_id and add profiles
+      const eventsMap: Record<string, InterventionEvent[]> = {};
+      (events || []).forEach(event => {
+        const profile = profiles?.find(p => p.user_id === event.user_id);
+        const eventWithProfile: InterventionEvent = {
+          ...event,
+          event_type: event.event_type as 'departure' | 'arrival',
+          profile,
+        };
+        
+        if (!eventsMap[event.intervention_id]) {
+          eventsMap[event.intervention_id] = [];
+        }
+        eventsMap[event.intervention_id].push(eventWithProfile);
+      });
+
+      return eventsMap;
+    },
+    enabled: interventionIds.length > 0,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+};
+
 // Fetch latest news with caching
 export const useLatestNews = () => {
   const queryClient = useQueryClient();
