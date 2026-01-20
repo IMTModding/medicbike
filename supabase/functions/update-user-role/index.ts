@@ -39,15 +39,17 @@ Deno.serve(async (req) => {
     // Create admin client for privileged operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if requesting user is an admin
-    const { data: adminRole, error: roleError } = await supabaseAdmin
+    // Check if requesting user is an admin or creator
+    const { data: requesterRole, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUser.id)
-      .eq("role", "admin")
       .maybeSingle();
 
-    if (roleError || !adminRole) {
+    const isCreator = requesterRole?.role === "creator";
+    const isAdmin = requesterRole?.role === "admin" || isCreator;
+
+    if (roleError || !isAdmin) {
       return new Response(
         JSON.stringify({ error: "Only admins can change user roles" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -104,16 +106,19 @@ Deno.serve(async (req) => {
       .select("id")
       .eq("admin_id", requestingUser.id);
 
-    const adminCodeIds = (adminCodes || []).map((c) => c.id);
-    const isInOrganization =
-      targetProfile.admin_id === requestingUser.id ||
-      (targetProfile.invite_code_id && adminCodeIds.includes(targetProfile.invite_code_id));
+    // Creator can manage ALL users, admins can only manage their organization
+    if (!isCreator) {
+      const adminCodeIds = (adminCodes || []).map((c) => c.id);
+      const isInOrganization =
+        targetProfile.admin_id === requestingUser.id ||
+        (targetProfile.invite_code_id && adminCodeIds.includes(targetProfile.invite_code_id));
 
-    if (!isInOrganization) {
-      return new Response(
-        JSON.stringify({ error: "You can only change roles for users in your organization" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!isInOrganization) {
+        return new Response(
+          JSON.stringify({ error: "You can only change roles for users in your organization" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Update the user's role
