@@ -27,11 +27,11 @@ export const SplashScreen = ({ onFinish }: SplashScreenProps) => {
 
   return (
     <div 
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background transition-opacity duration-500 safe-all ${
         fadeOut ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      <div className="flex flex-col items-center gap-6 animate-fade-in">
+      <div className="flex flex-col items-center gap-6 animate-fade-in px-4">
         <div className="relative">
           <img 
             src={logo} 

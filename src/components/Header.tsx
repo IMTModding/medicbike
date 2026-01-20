@@ -42,8 +42,8 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-      <div className="container flex items-center justify-between h-16 px-4 gap-2">
+    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border safe-top">
+      <div className="container flex items-center justify-between h-14 sm:h-16 px-4 gap-2">
         {/* Logo and title - fixed width */}
         <div className="flex items-center gap-2 shrink-0">
           <img src={logo} alt="MEDICBIKE Logo" className="w-9 h-9 rounded-full object-cover" />

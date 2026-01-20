@@ -8,12 +8,35 @@ const config: CapacitorConfig = {
     url: 'https://c8c83c43-8d58-4230-b53a-7b6bfe995fad.lovableproject.com?forceHideBadge=true',
     cleartext: true
   },
+  ios: {
+    contentInset: 'automatic',
+    preferredContentMode: 'mobile',
+    backgroundColor: '#0b1a2b'
+  },
+  android: {
+    backgroundColor: '#0b1a2b',
+    allowMixedContent: true
+  },
   plugins: {
     BackgroundGeolocation: {
-      // iOS specific
       locationAuthorizationRequest: 'Always',
-      // Android specific  
       enableHeadless: true
+    },
+    SplashScreen: {
+      launchAutoHide: true,
+      backgroundColor: '#0b1a2b',
+      showSpinner: false,
+      androidScaleType: 'CENTER_CROP',
+      splashFullScreen: true,
+      splashImmersive: true
+    },
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true
+    },
+    StatusBar: {
+      style: 'dark',
+      backgroundColor: '#0b1a2b'
     }
   }
 };
