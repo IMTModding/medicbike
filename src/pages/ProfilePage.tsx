@@ -2,11 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ const ProfilePage = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [locationSharingEnabled, setLocationSharingEnabled] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -26,7 +26,7 @@ const ProfilePage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [togglingLocation, setTogglingLocation] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading: authLoading, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
@@ -45,7 +45,7 @@ const ProfilePage = () => {
         const [profileRes, contactsRes] = await Promise.all([
           supabase
             .from('profiles')
-            .select('full_name, avatar_url, location_sharing_enabled')
+            .select('full_name, avatar_url')
             .eq('user_id', user.id)
             .maybeSingle(),
           supabase
@@ -62,7 +62,6 @@ const ProfilePage = () => {
         if (profileRes.data) {
           setFullName(profileRes.data.full_name || '');
           setAvatarUrl(profileRes.data.avatar_url || null);
-          setLocationSharingEnabled(profileRes.data.location_sharing_enabled || false);
         }
         if (contactsRes.data) {
           setPhone(contactsRes.data.phone || '');
@@ -194,27 +193,6 @@ const ProfilePage = () => {
     }
   };
 
-  const handleToggleLocationSharing = async (enabled: boolean) => {
-    if (!user) return;
-    
-    setTogglingLocation(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ location_sharing_enabled: enabled })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      setLocationSharingEnabled(enabled);
-      toast.success(enabled ? 'Partage de localisation activé' : 'Partage de localisation désactivé');
-    } catch (error) {
-      console.error('Error toggling location sharing:', error);
-      toast.error('Erreur lors de la mise à jour');
-    } finally {
-      setTogglingLocation(false);
-    }
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -362,32 +340,6 @@ const ProfilePage = () => {
           </Button>
         </div>
 
-        {/* Location Sharing Consent */}
-        <div className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-medium text-foreground">Partage de localisation</h3>
-                <p className="text-xs text-muted-foreground">
-                  Permet aux admins de voir votre position pour les interventions
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={locationSharingEnabled}
-              onCheckedChange={handleToggleLocationSharing}
-              disabled={togglingLocation}
-            />
-          </div>
-          {locationSharingEnabled && (
-            <p className="text-xs text-muted-foreground mt-3 bg-secondary/50 p-2 rounded">
-              Votre position est visible par les administrateurs de votre organisation pour coordonner les interventions d'urgence.
-            </p>
-          )}
-        </div>
 
         {/* Change Password */}
         <div className="bg-card rounded-xl border border-border p-4 space-y-4">

@@ -223,6 +223,7 @@ export type Database = {
           admin_id: string
           code: string
           created_at: string
+          expires_at: string | null
           id: string
           is_active: boolean
           organization_name: string
@@ -231,6 +232,7 @@ export type Database = {
           admin_id: string
           code: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           organization_name: string
@@ -239,6 +241,7 @@ export type Database = {
           admin_id?: string
           code?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           organization_name?: string
