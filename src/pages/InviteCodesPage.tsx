@@ -20,7 +20,7 @@ interface InviteCode {
 }
 
 const InviteCodesPage = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isCreator, role, loading } = useAuth();
   const navigate = useNavigate();
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [newOrgName, setNewOrgName] = useState('');
@@ -28,18 +28,23 @@ const InviteCodesPage = () => {
   const [loadingCodes, setLoadingCodes] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       navigate('/auth');
-    } else if (!loading && !isAdmin) {
+      return;
+    }
+    if (role === null) return;
+    if (!isAdmin && !isCreator) {
       navigate('/');
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, isCreator, role, loading, navigate]);
 
   useEffect(() => {
-    if (user && isAdmin) {
+    if (loading) return;
+    if (user && (isAdmin || isCreator)) {
       fetchCodes();
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, isCreator, loading]);
 
   const fetchCodes = async () => {
     if (!user) return;
