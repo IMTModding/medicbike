@@ -53,6 +53,11 @@
     --admin-strong: 270 92% 52%;
     --admin-foreground: 0 0% 100%;
 
+    /* Creator accent (red) - highest privilege */
+    --creator: 0 84% 60%;
+    --creator-strong: 0 90% 50%;
+    --creator-foreground: 0 0% 100%;
+
     --urgent: 0 84% 60%;
     --urgent-foreground: 0 0% 100%;
 

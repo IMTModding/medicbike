@@ -44,6 +44,11 @@ export default {
           strong: "hsl(var(--admin-strong))",
           foreground: "hsl(var(--admin-foreground))",
         },
+        creator: {
+          DEFAULT: "hsl(var(--creator))",
+          strong: "hsl(var(--creator-strong))",
+          foreground: "hsl(var(--creator-foreground))",
+        },
         urgent: {
           DEFAULT: "hsl(var(--urgent))",
           foreground: "hsl(var(--urgent-foreground))",

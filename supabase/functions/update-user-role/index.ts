@@ -70,6 +70,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if target user is a creator - their role cannot be changed
+    const { data: targetRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (targetRole?.role === "creator") {
+      return new Response(
+        JSON.stringify({ error: "Le rôle du Créateur ne peut pas être modifié" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Verify the target user is in the admin's organization
     const { data: targetProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
