@@ -15,7 +15,7 @@
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor/android": "^8.0.1",
-    "@capacitor/cli": "^8.0.1",
+    "@capacitor/cli": "^7.2.0",
     "@capacitor/core": "^8.0.1",
     "@capacitor/ios": "^8.0.1",
     "@hookform/resolvers": "^3.10.0",
