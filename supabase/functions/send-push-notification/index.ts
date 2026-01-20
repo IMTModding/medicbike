@@ -89,6 +89,7 @@ function getNotificationUrl(type?: string) {
   if (type === "chat") return "/general-chat";
   if (type === "news") return "/news";
   if (type === "login") return "/employees";
+  if (type === "departure" || type === "arrival") return "/";
   return "/";
 }
 
@@ -103,6 +104,8 @@ function getNotificationTag(params: {
   if (type === "chat") return `chat-${organizationId ?? "unknown"}`;
   if (type === "news") return `news-${newsId ?? "unknown"}`;
   if (type === "login") return `login-${employeeUserId ?? "unknown"}`;
+  if (type === "departure") return `departure-${interventionId ?? "unknown"}`;
+  if (type === "arrival") return `arrival-${interventionId ?? "unknown"}`;
   return `intervention-${interventionId ?? "unknown"}`;
 }
 
@@ -172,6 +175,7 @@ serve(async (req) => {
       body: notifBody,
       urgency,
       interventionId,
+      interventionTitle,
       type,
       organizationId,
       excludeUserId,
@@ -232,6 +236,55 @@ serve(async (req) => {
         .select("user_id")
         .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
       userIdsToNotify = (orgProfiles || []).map((p) => p.user_id).filter((id) => id !== excludeUserId);
+    } else if ((type === "departure" || type === "arrival") && senderUserId) {
+      // Departure/Arrival notification: notify ALL members of the sender's organization(s) (except sender)
+      console.log(`Processing ${type} notification for sender:`, senderUserId);
+      
+      // Get sender's name
+      const { data: senderProfile } = await supabase
+        .from("profiles")
+        .select("full_name, invite_code_id")
+        .eq("user_id", senderUserId)
+        .maybeSingle();
+      
+      const senderName = senderProfile?.full_name || "Un membre";
+      const orgId = senderProfile?.invite_code_id;
+      
+      // Build notification title and body based on type
+      const notifTitle = type === "departure" 
+        ? `🚗 Départ - ${interventionTitle || "Intervention"}`
+        : `🎯 Arrivée - ${interventionTitle || "Intervention"}`;
+      const notifMessage = type === "departure"
+        ? `${senderName} part sur l'intervention`
+        : `${senderName} est arrivé sur les lieux`;
+      
+      // Store computed title/body for later use
+      (body as any).computedTitle = notifTitle;
+      (body as any).computedBody = notifMessage;
+      
+      const allMemberIds: string[] = [];
+      
+      if (orgId) {
+        // Get all org members
+        const { data: orgMembers } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("invite_code_id", orgId);
+        
+        // Get admin of the org
+        const { data: adminProfile } = await supabase
+          .from("invite_codes")
+          .select("admin_id")
+          .eq("id", orgId)
+          .maybeSingle();
+        
+        (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+        if (adminProfile?.admin_id) allMemberIds.push(adminProfile.admin_id);
+      }
+      
+      // Remove duplicates and exclude sender
+      userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== senderUserId);
+      console.log(`Users to notify for ${type}:`, userIdsToNotify.length);
     } else if (type === "intervention" && senderUserId) {
       // Intervention notification: notify ALL members of the sender's organization(s) (except sender)
       console.log("Processing intervention notification for sender:", senderUserId);
@@ -362,9 +415,13 @@ serve(async (req) => {
       vapidKeys,
     });
 
+    // Use computed title/body for departure/arrival notifications
+    const finalTitle = (body as any).computedTitle || title;
+    const finalBody = (body as any).computedBody || notifBody;
+
     const payload = buildPayload({
-      title,
-      body: notifBody,
+      title: finalTitle,
+      body: finalBody,
       urgency,
       interventionId,
       type,

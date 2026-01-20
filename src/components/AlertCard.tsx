@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check } from 'lucide-react';
+import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check, Car, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
 interface AlertCardProps {
   intervention: Intervention;
   onStatusChange: (id: string, status: 'available' | 'unavailable') => void;
@@ -51,16 +52,80 @@ const getTimeAgo = (dateString: string) => {
   return `Il y a ${Math.floor(diffHours / 24)}j`;
 };
 
+// Calculate distance between two coordinates in meters (Haversine formula)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+// Send departure/arrival notification
+const sendStatusNotification = async (
+  type: 'departure' | 'arrival',
+  interventionId: string,
+  interventionTitle: string
+) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    const { error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        type,
+        interventionId,
+        interventionTitle,
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.error('Error sending status notification:', error);
+    }
+  } catch (err) {
+    console.error('Failed to send status notification:', err);
+  }
+};
+
 export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCardProps) => {
   const { isAdmin, user } = useAuth();
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
+  const [isDeparting, setIsDeparting] = useState(false);
+  const [hasArrived, setHasArrived] = useState(false);
   const watchIdRef = useRef<number | null>(null);
+  const arrivalNotifiedRef = useRef(false);
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
   const timeAgo = getTimeAgo(intervention.created_at);
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
+  const hasDeparted = intervention.userStatus === 'available';
 
-  // Start GPS tracking when user becomes available
+  // Check arrival based on GPS
+  const checkArrival = (userLat: number, userLon: number) => {
+    if (!intervention.latitude || !intervention.longitude) return false;
+    
+    const distance = calculateDistance(
+      userLat, userLon,
+      intervention.latitude, intervention.longitude
+    );
+    
+    console.log('Distance to intervention:', distance, 'meters');
+    
+    // Consider arrived if within 100 meters
+    return distance <= 100;
+  };
+
+  // Start GPS tracking with arrival detection
   const startGpsTracking = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if (!user) {
@@ -109,30 +174,51 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
 
           console.log('Location saved to database');
 
-          // Then start watching for continuous updates
+          // Then start watching for continuous updates with arrival detection
           watchIdRef.current = navigator.geolocation.watchPosition(
             async (pos) => {
-              const { error } = await supabase
+              const { latitude, longitude, accuracy } = pos.coords;
+              
+              // Save position to DB
+              await supabase
                 .from('user_locations')
                 .upsert({
                   user_id: user.id,
-                  latitude: pos.coords.latitude,
-                  longitude: pos.coords.longitude,
-                  accuracy: pos.coords.accuracy,
+                  latitude,
+                  longitude,
+                  accuracy,
                   updated_at: new Date().toISOString(),
                   is_active: true
                 }, {
                   onConflict: 'user_id'
                 });
               
-              if (error) {
-                console.error('Error updating location:', error);
+              // Check for arrival
+              if (!arrivalNotifiedRef.current && checkArrival(latitude, longitude)) {
+                arrivalNotifiedRef.current = true;
+                setHasArrived(true);
+                
+                // Send arrival notification
+                await sendStatusNotification('arrival', intervention.id, intervention.title);
+                toast.success('🎯 Vous êtes arrivé sur les lieux !');
+                
+                // Stop tracking after arrival
+                if (watchIdRef.current !== null) {
+                  navigator.geolocation.clearWatch(watchIdRef.current);
+                  watchIdRef.current = null;
+                }
+                
+                // Mark location as inactive
+                await supabase
+                  .from('user_locations')
+                  .update({ is_active: false })
+                  .eq('user_id', user.id);
               }
             },
             (err) => {
               console.error('Watch position error:', err);
             },
-            options
+            { ...options, maximumAge: 5000 } // Allow 5s cache for continuous tracking
           );
 
           resolve(true);
@@ -168,16 +254,27 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
     };
   }, []);
 
-  const handleAvailable = async () => {
-    // Start GPS tracking when user clicks "Dispo"
-    const gpsStarted = await startGpsTracking();
+  const handleDeparture = async () => {
+    setIsDeparting(true);
     
-    if (gpsStarted) {
-      toast.success('GPS activé - Votre position est partagée');
+    try {
+      // Start GPS tracking
+      const gpsStarted = await startGpsTracking();
+      
+      if (gpsStarted) {
+        toast.success('🚗 Départ signalé - GPS activé');
+        
+        // Send departure notification
+        await sendStatusNotification('departure', intervention.id, intervention.title);
+      } else {
+        toast.warning('Départ signalé sans GPS');
+      }
+      
+      // Mark as available (departed)
+      onStatusChange(intervention.id, 'available');
+    } finally {
+      setIsDeparting(false);
     }
-    
-    // Still mark as available even if GPS fails
-    onStatusChange(intervention.id, 'available');
   };
 
   const handleComplete = () => {
@@ -200,7 +297,6 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
       window.open(`https://waze.com/ul?navigate=yes&q=${encodedAddress}`, '_blank');
     }
   };
-  
 
   return (
     <div 
@@ -273,14 +369,23 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
           <div className={cn(
             "flex items-center justify-center gap-2 py-3 rounded-lg",
             intervention.userStatus === 'available' 
-              ? "bg-success/10 text-success" 
+              ? hasArrived 
+                ? "bg-success/20 text-success"
+                : "bg-primary/10 text-primary"
               : "bg-muted text-muted-foreground"
           )}>
             {intervention.userStatus === 'available' ? (
-              <>
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="font-medium">Vous êtes disponible</span>
-              </>
+              hasArrived ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="font-medium">Arrivé sur les lieux</span>
+                </>
+              ) : (
+                <>
+                  <Car className="w-5 h-5" />
+                  <span className="font-medium">En route...</span>
+                </>
+              )
             ) : (
               <>
                 <XCircle className="w-5 h-5" />
@@ -307,10 +412,15 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
               variant="available"
               size="xl"
               className="flex-1"
-              onClick={handleAvailable}
+              onClick={handleDeparture}
+              disabled={isDeparting}
             >
-              <CheckCircle2 />
-              Dispo
+              {isDeparting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Car />
+              )}
+              Départ
             </Button>
             <Button
               variant="unavailable"
