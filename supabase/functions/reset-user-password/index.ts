@@ -52,14 +52,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if user is admin
+    // Check if user is admin or creator
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requesterId)
       .single();
 
-    if (roleError || roleData?.role !== "admin") {
+    const isCreator = roleData?.role === "creator";
+    const isAdmin = roleData?.role === "admin" || isCreator;
+
+    if (roleError || !isAdmin) {
       return new Response(
         JSON.stringify({ error: "Seuls les administrateurs peuvent réinitialiser les mots de passe" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -89,21 +92,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if user belongs to admin's organization
-    const { data: adminCodes } = await supabaseAdmin
-      .from("invite_codes")
-      .select("id")
-      .eq("admin_id", requesterId);
+    // Creator can reset ANY user's password, admins can only reset their organization's users
+    if (!isCreator) {
+      const { data: adminCodes } = await supabaseAdmin
+        .from("invite_codes")
+        .select("id")
+        .eq("admin_id", requesterId);
 
-    const adminCodeIds = (adminCodes || []).map(c => c.id);
-    const belongsToAdmin = targetProfile.admin_id === requesterId || 
-                          (targetProfile.invite_code_id && adminCodeIds.includes(targetProfile.invite_code_id));
+      const adminCodeIds = (adminCodes || []).map(c => c.id);
+      const belongsToAdmin = targetProfile.admin_id === requesterId || 
+                            (targetProfile.invite_code_id && adminCodeIds.includes(targetProfile.invite_code_id));
 
-    if (!belongsToAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Cet utilisateur n'appartient pas à votre organisation" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!belongsToAdmin) {
+        return new Response(
+          JSON.stringify({ error: "Cet utilisateur n'appartient pas à votre organisation" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Generate a new temporary password

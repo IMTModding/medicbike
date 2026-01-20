@@ -44,14 +44,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin or creator
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", userData.user.id)
       .single();
 
-    if (roleError || roleData?.role !== "admin") {
+    const isCreator = roleData?.role === "creator";
+    const isAdmin = roleData?.role === "admin" || isCreator;
+
+    if (roleError || !isAdmin) {
       console.error("User is not admin:", roleError);
       return new Response(
         JSON.stringify({ error: "Seuls les administrateurs peuvent supprimer des utilisateurs" }),
@@ -83,24 +86,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if the user belongs to this admin
-    const { data: adminCodes } = await supabaseAdmin
-      .from("invite_codes")
-      .select("id")
-      .eq("admin_id", userData.user.id);
+    // Creator can delete ANY user, admins can only delete users in their organization
+    if (!isCreator) {
+      const { data: adminCodes } = await supabaseAdmin
+        .from("invite_codes")
+        .select("id")
+        .eq("admin_id", userData.user.id);
 
-    const adminCodeIds = (adminCodes || []).map(c => c.id);
-    
-    const belongsToAdmin = 
-      profileToDelete.admin_id === userData.user.id ||
-      (profileToDelete.invite_code_id && adminCodeIds.includes(profileToDelete.invite_code_id));
+      const adminCodeIds = (adminCodes || []).map(c => c.id);
+      
+      const belongsToAdmin = 
+        profileToDelete.admin_id === userData.user.id ||
+        (profileToDelete.invite_code_id && adminCodeIds.includes(profileToDelete.invite_code_id));
 
-    if (!belongsToAdmin) {
-      console.error("User does not belong to admin's organization");
-      return new Response(
-        JSON.stringify({ error: "Cet utilisateur n'appartient pas à votre organisation" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!belongsToAdmin) {
+        console.error("User does not belong to admin's organization");
+        return new Response(
+          JSON.stringify({ error: "Cet utilisateur n'appartient pas à votre organisation" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Prevent admin from deleting themselves
