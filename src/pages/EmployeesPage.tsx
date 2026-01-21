@@ -428,12 +428,13 @@ const EmployeesPage = () => {
                     isEmployeeAdmin && !isEmployeeCreator && "border-admin/50 bg-admin/5"
                   )}
                 >
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
+                  <CardContent className="py-4 px-4">
+                    {/* Header row: Avatar + Name + Badges */}
+                    <div className="flex items-center gap-3 mb-3">
                       {/* Avatar */}
                       <div
                         className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center overflow-hidden mr-3 flex-shrink-0",
+                          "w-12 h-12 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0",
                           isEmployeeCreator
                             ? "bg-gradient-to-br from-creator to-creator-strong"
                             : isEmployeeAdmin
@@ -448,177 +449,178 @@ const EmployeesPage = () => {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <User className="w-5 h-5 text-white" />
+                          <User className="w-6 h-6 text-white" />
                         )}
                       </div>
                       
+                      {/* Name + Role badge */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          {/* Online indicator */}
-                          <div
-                            className={cn(
-                              "w-2.5 h-2.5 rounded-full",
-                              status.color
-                            )}
-                          />
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3
                             className={cn(
-                              "font-semibold truncate",
+                              "font-semibold text-base",
                               isEmployeeCreator ? "text-creator" : isEmployeeAdmin ? "text-admin" : "text-foreground"
                             )}
                           >
                             {employee.full_name || 'Sans nom'}
                           </h3>
                           {isEmployeeCreator && (
-                            <Badge className="bg-creator text-creator-foreground text-xs">
+                            <Badge className="bg-creator text-creator-foreground text-xs px-2 py-0.5">
                               Créateur
                             </Badge>
                           )}
                           {isEmployeeAdmin && !isEmployeeCreator && (
-                            <Badge className="bg-admin text-admin-foreground text-xs">
+                            <Badge className="bg-admin text-admin-foreground text-xs px-2 py-0.5">
                               Admin
                             </Badge>
                           )}
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", status.textColor)}
-                          >
-                            {status.label}
-                          </Badge>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                          {employee.email && (
-                            <button
-                              className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-                              onClick={async () => {
-                                await navigator.clipboard.writeText(employee.email!);
-                                toast.success('Email copié !');
-                              }}
-                              title="Cliquez pour copier l'email"
-                            >
-                              <Mail className="w-3 h-3" />
-                              <span className="truncate max-w-[180px]">{employee.email}</span>
-                            </button>
-                          )}
-                          {employee.organization_name && (
-                            <span className="flex items-center gap-1">
-                              <Building2 className="w-3 h-3" />
-                              {employee.organization_name}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Inscrit le{' '}
-                            {format(new Date(employee.created_at), 'dd MMM yyyy', {
-                              locale: fr,
-                            })}
+                        {/* Status badge */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <div
+                            className={cn(
+                              "w-2 h-2 rounded-full flex-shrink-0",
+                              status.color
+                            )}
+                          />
+                          <span className={cn("text-xs", status.textColor)}>
+                            {status.label}
                           </span>
                         </div>
                       </div>
-
-                      {/* Contact buttons */}
-                      <div className="flex items-center gap-1">
-                        {employee.phone && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-green-500 hover:text-green-600 hover:bg-green-500/10"
-                              onClick={() => window.open(`tel:${employee.phone}`, '_self')}
-                              title="Appeler"
-                            >
-                              <Phone className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                              onClick={() => window.open(`sms:${employee.phone}`, '_self')}
-                              title="Envoyer un SMS"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                        {/* Role dropdown - disabled for creators */}
-                        {!isEmployeeCreator && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1 text-muted-foreground hover:text-foreground"
-                                disabled={updatingRoleId === employee.user_id || employee.user_id === user?.id}
-                                title="Changer le rôle"
-                              >
-                                <Shield className="w-4 h-4" />
-                                <ChevronDown className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleChangeRole(employee.user_id, 'admin')}
-                                disabled={isEmployeeAdmin}
-                                className={cn(isEmployeeAdmin && "opacity-50")}
-                              >
-                                <Shield className="w-4 h-4 mr-2 text-admin" />
-                                Administrateur
-                                {isEmployeeAdmin && " ✓"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleChangeRole(employee.user_id, 'employee')}
-                                disabled={!hasAdminPrivileges}
-                                className={cn(!hasAdminPrivileges && "opacity-50")}
-                              >
-                                <User className="w-4 h-4 mr-2" />
-                                Employé
-                                {!hasAdminPrivileges && " ✓"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-primary hover:text-primary hover:bg-primary/10"
-                          onClick={() => setResetPasswordEmployee(employee)}
-                          title="Réinitialiser le mot de passe"
+                    </div>
+                    
+                    {/* Info rows */}
+                    <div className="space-y-1.5 text-sm text-muted-foreground mb-3 pl-15">
+                      {employee.email && (
+                        <button
+                          className="flex items-center gap-2 hover:text-foreground transition-colors cursor-pointer w-full text-left"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(employee.email!);
+                            toast.success('Email copié !');
+                          }}
+                          title="Cliquez pour copier l'email"
                         >
-                          <KeyRound className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                          <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{employee.email}</span>
+                        </button>
+                      )}
+                      {employee.organization_name && (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>{employee.organization_name}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>
+                          Inscrit le {format(new Date(employee.created_at), 'dd MMM yyyy', { locale: fr })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-end gap-1 pt-2 border-t border-border/50">
+                      {employee.phone && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-green-500 hover:text-green-600 hover:bg-green-500/10 h-8 px-2"
+                            onClick={() => window.open(`tel:${employee.phone}`, '_self')}
+                            title="Appeler"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 h-8 px-2"
+                            onClick={() => window.open(`sms:${employee.phone}`, '_self')}
+                            title="Envoyer un SMS"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {/* Role dropdown - disabled for creators */}
+                      {!isEmployeeCreator && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive"
-                              disabled={deletingId === employee.id}
+                              size="sm"
+                              className="gap-1 text-muted-foreground hover:text-foreground h-8 px-2"
+                              disabled={updatingRoleId === employee.user_id || employee.user_id === user?.id}
+                              title="Changer le rôle"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Shield className="w-4 h-4" />
+                              <ChevronDown className="w-3 h-3" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                <strong>{employee.full_name || 'Cet employé'}</strong> sera supprimé définitivement. 
-                                Son compte et toutes ses données seront effacés. Cette action est irréversible.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  handleDeleteEmployee(employee.id, employee.user_id)
-                                }
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Supprimer définitivement
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleChangeRole(employee.user_id, 'admin')}
+                              disabled={isEmployeeAdmin}
+                              className={cn(isEmployeeAdmin && "opacity-50")}
+                            >
+                              <Shield className="w-4 h-4 mr-2 text-admin" />
+                              Administrateur
+                              {isEmployeeAdmin && " ✓"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleChangeRole(employee.user_id, 'employee')}
+                              disabled={!hasAdminPrivileges}
+                              className={cn(!hasAdminPrivileges && "opacity-50")}
+                            >
+                              <User className="w-4 h-4 mr-2" />
+                              Employé
+                              {!hasAdminPrivileges && " ✓"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary hover:text-primary hover:bg-primary/10 h-8 px-2"
+                        onClick={() => setResetPasswordEmployee(employee)}
+                        title="Réinitialiser le mot de passe"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive h-8 px-2"
+                            disabled={deletingId === employee.id}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer cet employé ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <strong>{employee.full_name || 'Cet employé'}</strong> sera supprimé définitivement. 
+                              Son compte et toutes ses données seront effacés. Cette action est irréversible.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() =>
+                                handleDeleteEmployee(employee.id, employee.user_id)
+                              }
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Supprimer définitivement
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </CardContent>
                 </Card>
