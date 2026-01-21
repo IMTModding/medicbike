@@ -312,15 +312,14 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`Authenticated user: ${user.id}`);
 
-    // ========== AUTHORIZATION CHECK - Admin Only ==========
+    // ========== AUTHORIZATION CHECK - Admin or Creator ==========
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
+      .in("role", ["admin", "creator"]);
 
     if (roleError) {
       console.error("Error checking role:", roleError.message);
@@ -330,15 +329,18 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    if (!roleData) {
-      console.error("User is not an admin");
+    const hasPermission = roleData && roleData.length > 0;
+    const isCreator = roleData?.some(r => r.role === "creator");
+
+    if (!hasPermission) {
+      console.error("User is not an admin or creator");
       return new Response(
-        JSON.stringify({ error: "Accès non autorisé. Seuls les administrateurs peuvent exporter l'historique." }),
+        JSON.stringify({ error: "Accès non autorisé. Seuls les administrateurs et créateurs peuvent exporter l'historique." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("User is admin, proceeding with export");
+    console.log(`User has permission (creator: ${isCreator}), proceeding with export`);
 
     // ========== GET ADMIN'S ORGANIZATION INFO ==========
     const { data: adminProfile, error: profileError } = await supabase
