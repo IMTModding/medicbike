@@ -129,30 +129,14 @@ const EmployeesPage = () => {
 
     setLoadingEmployees(true);
 
-    // First, get invite codes.
-    // - Admin: only their own codes
-    // - Creator: all codes (global view)
-    const codesQuery = supabase
+    // Fetch invite codes - RLS now allows admins to see their organization's codes
+    const { data: codes, error: codesError } = await supabase
       .from('invite_codes')
       .select('id, organization_name');
 
-    const { data: codes, error: codesError } = isCreator
-      ? await codesQuery
-      : await codesQuery.eq('admin_id', user.id);
-
     if (codesError) {
       console.error('Error fetching codes:', codesError);
-      setLoadingEmployees(false);
-      return;
-    }
-
-    // If admin has no codes, they have no organization yet.
-    // For creator, we still continue (they can see users even if there are no codes).
-    if (!isCreator && (!codes || codes.length === 0)) {
-      setEmployees([]);
-      setFilteredEmployees([]);
-      setLoadingEmployees(false);
-      return;
+      // Don't return early - still try to fetch profiles
     }
 
     const codeMap = new Map((codes || []).map((c) => [c.id, c.organization_name]));
