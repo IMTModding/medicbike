@@ -44,9 +44,12 @@ const GeneralChatPage = () => {
   const [editingText, setEditingText] = useState<string>('');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -217,10 +220,48 @@ const GeneralChatPage = () => {
     };
   }, [organizationId, profiles]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom only when not user scrolling and for new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    // Only auto-scroll if user is not actively scrolling
+    if (!isUserScrolling) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isUserScrolling]);
+
+  // Handle user scroll detection
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    
+    const container = messagesContainerRef.current;
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+    
+    // If user scrolled away from bottom, mark as scrolling
+    if (!isAtBottom) {
+      setIsUserScrolling(true);
+      
+      // Clear any existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    } else {
+      // User is at bottom, allow auto-scroll after a delay
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsUserScrolling(false);
+      }, 300);
+    }
+  };
+
+  // Clean up scroll timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -379,20 +420,21 @@ const GeneralChatPage = () => {
 
   return (
     <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-b border-border z-10">
+      {/* Header with safe area for iPhone notch */}
+      <header className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-b border-border z-10 pt-[env(safe-area-inset-top)]">
         <div className="container flex items-center gap-4 h-16 px-4">
           <button 
             onClick={() => navigate('/')}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+            className="w-10 h-10 min-w-[40px] rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors touch-target"
+            aria-label="Retour"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 flex-shrink-0" />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 min-w-[40px] rounded-full bg-primary/20 flex items-center justify-center">
               <MessageCircle className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="font-bold text-lg text-foreground">Chat général</h1>
               <p className="text-xs text-muted-foreground">
                 {messages.length} message{messages.length > 1 ? 's' : ''}
@@ -403,7 +445,11 @@ const GeneralChatPage = () => {
       </header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
+      <main 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 min-h-0"
+        onScroll={handleScroll}
+      >
         {loadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-pulse text-muted-foreground">Chargement...</div>
