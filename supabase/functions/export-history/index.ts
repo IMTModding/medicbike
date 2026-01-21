@@ -1,12 +1,23 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 // Base64 encode helper for Deno
 function toBase64(str: string): string {
   return btoa(unescape(encodeURIComponent(str)));
+}
+
+// Convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 const corsHeaders = {
@@ -97,7 +108,11 @@ const generateCSV = (interventions: Intervention[]): string => {
   return [headers.join(';'), ...rows].join('\n');
 };
 
-const generatePDFHTML = (interventions: Intervention[], startDate?: string, endDate?: string): string => {
+const generatePDF = (interventions: Intervention[], startDate?: string, endDate?: string): ArrayBuffer => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
   const totalInterventions = interventions.length;
   const totalAvailable = interventions.reduce((acc, i) => 
     acc + i.intervention_responses.filter(r => r.status === 'available').length, 0);
@@ -106,102 +121,154 @@ const generatePDFHTML = (interventions: Intervention[], startDate?: string, endD
     ? `${startDate ? `Du ${formatDate(startDate)}` : ''} ${endDate ? `Au ${formatDate(endDate)}` : ''}`
     : 'Toutes les interventions';
 
-  const rows = interventions.map(intervention => {
+  // Header with blue background
+  doc.setFillColor(59, 130, 246);
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.text('Historique des Interventions', pageWidth / 2, 18, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(dateRange, pageWidth / 2, 28, { align: 'center' });
+  doc.text(`Généré le ${formatDate(new Date().toISOString())}`, pageWidth / 2, 35, { align: 'center' });
+  
+  // Stats boxes
+  doc.setTextColor(33, 37, 41);
+  doc.setFillColor(248, 250, 252);
+  
+  // Box 1: Total interventions
+  doc.roundedRect(14, 50, 85, 25, 3, 3, 'F');
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(59, 130, 246);
+  doc.text(totalInterventions.toString(), 56, 62, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setTextColor(107, 114, 128);
+  doc.setFont("helvetica", "normal");
+  doc.text('Interventions terminées', 56, 70, { align: 'center' });
+  
+  // Box 2: Total available
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(110, 50, 85, 25, 3, 3, 'F');
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(34, 197, 94);
+  doc.text(totalAvailable.toString(), 152, 62, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setTextColor(107, 114, 128);
+  doc.setFont("helvetica", "normal");
+  doc.text('Réponses disponibles', 152, 70, { align: 'center' });
+  
+  // Table header
+  let yPos = 90;
+  const colWidths = [50, 35, 22, 35, 22, 30];
+  const colX = [14, 64, 99, 121, 156, 178];
+  const headers = ['Intervention', 'Lieu', 'Urgence', 'Date', 'Dispo', 'Personnes'];
+  
+  doc.setFillColor(248, 250, 252);
+  doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
+  
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(55, 65, 81);
+  headers.forEach((header, i) => {
+    doc.text(header, colX[i], yPos);
+  });
+  
+  yPos += 10;
+  
+  // Table rows
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  
+  interventions.forEach((intervention, index) => {
+    if (yPos > pageHeight - 25) {
+      doc.addPage();
+      yPos = 20;
+      
+      // Re-draw header on new page
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(55, 65, 81);
+      headers.forEach((header, i) => {
+        doc.text(header, colX[i], yPos);
+      });
+      yPos += 10;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+    }
+    
     const availableResponses = intervention.intervention_responses.filter(r => r.status === 'available');
     const unavailableCount = intervention.intervention_responses.filter(r => r.status === 'unavailable').length;
     const availableNames = availableResponses
       .map(r => r.profiles?.full_name || 'Utilisateur')
+      .slice(0, 2)
       .join(', ');
-
-    const urgencyColor = intervention.urgency === 'high' ? '#ef4444' : 
-                        intervention.urgency === 'medium' ? '#f59e0b' : '#22c55e';
-
-    return `
-      <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-          <strong>${intervention.title}</strong>
-          ${intervention.description ? `<br><span style="color: #6b7280; font-size: 12px;">${intervention.description}</span>` : ''}
-        </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${intervention.location}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-          <span style="background-color: ${urgencyColor}20; color: ${urgencyColor}; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
-            ${getUrgencyLabel(intervention.urgency)}
-          </span>
-        </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">
-          ${formatDate(intervention.created_at)}
-          ${intervention.completed_at ? `<br><span style="color: #22c55e;">Terminée: ${formatDate(intervention.completed_at)}</span>` : ''}
-        </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
-          <span style="color: #22c55e; font-weight: bold;">${availableResponses.length}</span> / 
-          <span style="color: #6b7280;">${unavailableCount}</span>
-        </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-size: 12px;">
-          ${availableNames || '-'}
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #1f2937; }
-        .header { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; }
-        .header h1 { margin: 0 0 10px 0; font-size: 24px; }
-        .header p { margin: 0; opacity: 0.9; }
-        .stats { display: flex; gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; flex: 1; text-align: center; }
-        .stat-value { font-size: 28px; font-weight: bold; color: #3b82f6; }
-        .stat-label { font-size: 14px; color: #6b7280; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        th { background: #f8fafc; padding: 14px; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; }
-        .footer { margin-top: 30px; text-align: center; color: #6b7280; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>🚨 Historique des Interventions</h1>
-        <p>${dateRange}</p>
-        <p>Généré le ${formatDate(new Date().toISOString())}</p>
-      </div>
-      
-      <div class="stats">
-        <div class="stat-card">
-          <div class="stat-value">${totalInterventions}</div>
-          <div class="stat-label">Interventions terminées</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${totalAvailable}</div>
-          <div class="stat-label">Total réponses disponibles</div>
-        </div>
-      </div>
-      
-      <table>
-        <thead>
-          <tr>
-            <th>Intervention</th>
-            <th>Lieu</th>
-            <th>Urgence</th>
-            <th>Dates</th>
-            <th>Dispo/Indispo</th>
-            <th>Personnes disponibles</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
-      
-      <div class="footer">
-        <p>Document généré automatiquement - Système de gestion des interventions</p>
-      </div>
-    </body>
-    </html>
-  `;
+    
+    // Alternating row colors
+    if (index % 2 === 0) {
+      doc.setFillColor(255, 255, 255);
+    } else {
+      doc.setFillColor(249, 250, 251);
+    }
+    doc.rect(14, yPos - 4, pageWidth - 28, 12, 'F');
+    
+    doc.setTextColor(31, 41, 55);
+    
+    // Title (truncated)
+    const title = intervention.title.length > 25 ? intervention.title.substring(0, 22) + '...' : intervention.title;
+    doc.text(title, colX[0], yPos);
+    
+    // Location (truncated)
+    const location = intervention.location.length > 18 ? intervention.location.substring(0, 15) + '...' : intervention.location;
+    doc.text(location, colX[1], yPos);
+    
+    // Urgency with color
+    const urgencyLabel = getUrgencyLabel(intervention.urgency);
+    if (intervention.urgency === 'high') {
+      doc.setTextColor(239, 68, 68);
+    } else if (intervention.urgency === 'medium') {
+      doc.setTextColor(245, 158, 11);
+    } else {
+      doc.setTextColor(34, 197, 94);
+    }
+    doc.text(urgencyLabel, colX[2], yPos);
+    
+    doc.setTextColor(31, 41, 55);
+    
+    // Date
+    doc.text(formatDate(intervention.created_at).split(' ')[0], colX[3], yPos);
+    
+    // Dispo/Indispo
+    doc.setTextColor(34, 197, 94);
+    doc.text(`${availableResponses.length}`, colX[4], yPos);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`/${unavailableCount}`, colX[4] + 6, yPos);
+    
+    doc.setTextColor(31, 41, 55);
+    // Names (truncated)
+    const names = availableNames.length > 15 ? availableNames.substring(0, 12) + '...' : (availableNames || '-');
+    doc.text(names, colX[5], yPos);
+    
+    yPos += 12;
+  });
+  
+  // Footer on all pages
+  const totalPages = doc.internal.pages.length - 1;
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Page ${i} / ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text('Système de gestion des interventions', 14, pageHeight - 10);
+  }
+  
+  return doc.output('arraybuffer');
 };
 
 serve(async (req: Request): Promise<Response> => {
@@ -406,10 +473,10 @@ serve(async (req: Request): Promise<Response> => {
       filename = `historique-interventions-${new Date().toISOString().split('T')[0]}.csv`;
       mimeType = "text/csv";
     } else {
-      const htmlContent = generatePDFHTML(typedInterventions, startDate, endDate);
-      attachment = toBase64(htmlContent);
-      filename = `historique-interventions-${new Date().toISOString().split('T')[0]}.html`;
-      mimeType = "text/html";
+      const pdfBuffer = generatePDF(typedInterventions, startDate, endDate);
+      attachment = arrayBufferToBase64(pdfBuffer);
+      filename = `historique-interventions-${new Date().toISOString().split('T')[0]}.pdf`;
+      mimeType = "application/pdf";
     }
 
     const dateRangeText = startDate || endDate 
