@@ -289,17 +289,25 @@ serve(async (req) => {
       // Intervention notification: notify ALL members of the sender's organization(s) (except sender)
       console.log("Processing intervention notification for sender:", senderUserId);
       
-      // Check if sender is admin
-      const { data: adminCheck } = await supabase
+      // Check if sender is admin or creator
+      const { data: roleCheck } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", senderUserId)
-        .eq("role", "admin")
+        .in("role", ["admin", "creator"])
         .maybeSingle();
 
       const allMemberIds: string[] = [];
 
-      if (adminCheck) {
+      if (roleCheck?.role === "creator") {
+        // Creator: notify ALL users from ALL organizations
+        console.log("Sender is creator - notifying all users");
+        const { data: allProfiles } = await supabase
+          .from("profiles")
+          .select("user_id");
+        
+        (allProfiles || []).forEach((p) => allMemberIds.push(p.user_id));
+      } else if (roleCheck?.role === "admin") {
         // Sender is admin - get ALL their invite codes
         const { data: inviteCodes } = await supabase
           .from("invite_codes")
@@ -361,16 +369,21 @@ serve(async (req) => {
         .maybeSingle();
 
       if (senderProfile) {
-        const { data: adminCheck } = await supabase
+        // Check if sender is creator or admin
+        const { data: roleCheck } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", senderUserId)
-          .eq("role", "admin")
+          .in("role", ["admin", "creator"])
           .maybeSingle();
 
         let orgIds: string[] = [];
 
-        if (adminCheck) {
+        if (roleCheck?.role === "creator") {
+          // Creator: get ALL invite codes
+          const { data: allCodes } = await supabase.from("invite_codes").select("id");
+          orgIds = (allCodes || []).map((ic) => ic.id);
+        } else if (roleCheck?.role === "admin") {
           const { data: inviteCodes } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId);
           orgIds = (inviteCodes || []).map((ic) => ic.id);
         } else if (senderProfile.invite_code_id) {
