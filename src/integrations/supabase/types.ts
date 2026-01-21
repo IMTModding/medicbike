@@ -47,6 +47,7 @@ export type Database = {
           id: string
           message: string
           organization_id: string | null
+          reply_to_id: string | null
           user_id: string
         }
         Insert: {
@@ -54,6 +55,7 @@ export type Database = {
           id?: string
           message: string
           organization_id?: string | null
+          reply_to_id?: string | null
           user_id: string
         }
         Update: {
@@ -61,6 +63,7 @@ export type Database = {
           id?: string
           message?: string
           organization_id?: string | null
+          reply_to_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -69,6 +72,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "invite_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "general_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "general_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -156,6 +166,7 @@ export type Database = {
           id: string
           intervention_id: string
           message: string
+          reply_to_id: string | null
           user_id: string
         }
         Insert: {
@@ -163,6 +174,7 @@ export type Database = {
           id?: string
           intervention_id: string
           message: string
+          reply_to_id?: string | null
           user_id: string
         }
         Update: {
@@ -170,6 +182,7 @@ export type Database = {
           id?: string
           intervention_id?: string
           message?: string
+          reply_to_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -178,6 +191,13 @@ export type Database = {
             columns: ["intervention_id"]
             isOneToOne: false
             referencedRelation: "interventions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intervention_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_messages"
             referencedColumns: ["id"]
           },
         ]
