@@ -135,7 +135,7 @@ const ExportHistoryDialog = ({ startDate, endDate }: ExportHistoryDialogProps) =
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-urgent" />
                   <div>
-                    <p className="font-medium text-sm">HTML</p>
+                    <p className="font-medium text-sm">PDF</p>
                     <p className="text-xs text-muted-foreground">Impression</p>
                   </div>
                 </div>
