@@ -19,7 +19,9 @@ import {
   CheckSquare,
   Square,
   Car,
-  Target
+  Target,
+  FileText,
+  Edit3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ExportHistoryDialog from '@/components/ExportHistoryDialog';
+import CompletionNotesDialog from '@/components/CompletionNotesDialog';
 import { HistoryPageSkeleton } from '@/components/PageSkeleton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
@@ -75,8 +78,14 @@ const HistoryPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [selectedIntervention, setSelectedIntervention] = useState<{
+    id: string;
+    title: string;
+    completion_notes: string | null;
+  } | null>(null);
   
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, loading: authLoading, isAdmin, isCreator } = useAuth();
   const navigate = useNavigate();
 
   // React Query with caching
@@ -189,9 +198,20 @@ const HistoryPage = () => {
 
   const canDelete = useMemo(() => {
     if (!user) return false;
-    if (isAdmin) return true;
+    if (isAdmin || isCreator) return true;
     return filteredInterventions.some((i: any) => i.created_by === user.id);
-  }, [filteredInterventions, isAdmin, user]);
+  }, [filteredInterventions, isAdmin, isCreator, user]);
+
+  const canEditNotes = isAdmin || isCreator;
+
+  const openNotesDialog = (intervention: any) => {
+    setSelectedIntervention({
+      id: intervention.id,
+      title: intervention.title,
+      completion_notes: intervention.completion_notes || null,
+    });
+    setNotesDialogOpen(true);
+  };
 
   if (authLoading) {
     return (
@@ -547,6 +567,39 @@ const HistoryPage = () => {
                   )}
                 </div>
 
+                {/* Completion Notes */}
+                {(intervention.completion_notes || canEditNotes) && !selectionMode && (
+                  <div className="mt-3 bg-accent/30 rounded-lg p-3 border border-accent">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-primary" />
+                        Notes de fin d'intervention
+                      </h4>
+                      {canEditNotes && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNotesDialog(intervention);
+                          }}
+                          className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          {intervention.completion_notes ? 'Modifier' : 'Ajouter'}
+                        </button>
+                      )}
+                    </div>
+                    {intervention.completion_notes ? (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {intervention.completion_notes}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        Aucune note ajoutée
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Departure/Arrival Events */}
                 {eventsMap[intervention.id] && eventsMap[intervention.id].length > 0 && (
                   <div className="mt-3 bg-primary/5 rounded-lg p-3 border border-primary/20">
@@ -611,6 +664,18 @@ const HistoryPage = () => {
           </div>
         )}
       </main>
+
+      {/* Completion Notes Dialog */}
+      {selectedIntervention && (
+        <CompletionNotesDialog
+          open={notesDialogOpen}
+          onOpenChange={setNotesDialogOpen}
+          interventionId={selectedIntervention.id}
+          interventionTitle={selectedIntervention.title}
+          currentNotes={selectedIntervention.completion_notes}
+          onSaved={() => refetch()}
+        />
+      )}
     </div>
   );
 };
