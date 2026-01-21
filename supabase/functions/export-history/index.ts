@@ -188,10 +188,14 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
   doc.setFontSize(7);
   
   interventions.forEach((intervention, index) => {
-    // Calculate row height based on whether there are completion notes
+    // Calculate row height based on whether there are notes or available employees
     const hasNotes = intervention.completion_notes && intervention.completion_notes.trim().length > 0;
+    const availableResponses = intervention.intervention_responses.filter(r => r.status === 'available');
+    const hasAvailableEmployees = availableResponses.length > 0;
+    const showDetails = hasNotes || hasAvailableEmployees;
     const baseRowHeight = 12;
-    const notesRowHeight = hasNotes ? 10 : 0;
+    // Add more height if both notes and employees are shown
+    const notesRowHeight = showDetails ? (hasNotes && hasAvailableEmployees ? 14 : 10) : 0;
     const totalRowHeight = baseRowHeight + notesRowHeight;
     
     if (yPos > pageHeight - 25 - notesRowHeight) {
@@ -212,7 +216,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
       doc.setFontSize(7);
     }
     
-    const availableResponses = intervention.intervention_responses.filter(r => r.status === 'available');
     const unavailableCount = intervention.intervention_responses.filter(r => r.status === 'unavailable').length;
     const availableNames = availableResponses
       .map(r => r.profiles?.full_name || 'Utilisateur')
@@ -266,15 +269,36 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
     
     yPos += baseRowHeight;
     
-    // Add completion notes if present
-    if (hasNotes) {
+    // Show available employees and notes
+    const allAvailableEmployeeNames = availableResponses
+      .map(r => r.profiles?.full_name || 'Utilisateur')
+      .join(', ');
+    
+    if (showDetails) {
       doc.setFontSize(6);
       doc.setTextColor(75, 85, 99);
       doc.setFont("helvetica", "italic");
-      const notesText = intervention.completion_notes!.length > 120 
-        ? intervention.completion_notes!.substring(0, 117) + '...' 
-        : intervention.completion_notes!;
-      doc.text(`Note: ${notesText}`, 16, yPos - 2);
+      
+      let noteLineYPos = yPos - 2;
+      
+      // Show available employees
+      if (hasAvailableEmployees) {
+        const employeesText = `Intervenants (${availableResponses.length}): ${allAvailableEmployeeNames}`;
+        const truncatedEmployees = employeesText.length > 120 
+          ? employeesText.substring(0, 117) + '...' 
+          : employeesText;
+        doc.text(truncatedEmployees, 16, noteLineYPos);
+        noteLineYPos += 4;
+      }
+      
+      // Show completion notes
+      if (hasNotes) {
+        const notesText = intervention.completion_notes!.length > 100 
+          ? intervention.completion_notes!.substring(0, 97) + '...' 
+          : intervention.completion_notes!;
+        doc.text(`Note: ${notesText}`, 16, noteLineYPos);
+      }
+      
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       yPos += notesRowHeight;
