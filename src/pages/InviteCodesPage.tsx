@@ -51,11 +51,10 @@ const InviteCodesPage = () => {
     
     setLoadingCodes(true);
     
-    // Fetch codes created by this admin
+    // Fetch codes - RLS handles visibility (own codes + organization codes for admins)
     const { data: codesData, error } = await supabase
       .from('invite_codes')
       .select('*')
-      .eq('admin_id', user.id)
       .order('created_at', { ascending: false });
     
     if (error) {
