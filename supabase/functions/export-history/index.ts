@@ -274,7 +274,7 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
       const notesText = intervention.completion_notes!.length > 120 
         ? intervention.completion_notes!.substring(0, 117) + '...' 
         : intervention.completion_notes!;
-      doc.text(`📝 ${notesText}`, 16, yPos - 2);
+      doc.text(`Note: ${notesText}`, 16, yPos - 2);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       yPos += notesRowHeight;
