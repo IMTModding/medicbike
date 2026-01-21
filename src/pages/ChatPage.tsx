@@ -172,9 +172,9 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+      <header className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-b border-border z-10">
         <div className="container flex items-center h-16 px-4">
           <button 
             onClick={() => navigate(-1)}
@@ -193,7 +193,7 @@ const ChatPage = () => {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-16">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -245,14 +245,14 @@ const ChatPage = () => {
       {/* Input */}
       <form 
         onSubmit={handleSendMessage}
-        className="sticky bottom-0 bg-background border-t border-border p-4"
+        className="flex-shrink-0 bg-background border-t border-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       >
         <div className="flex gap-2">
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Écrire un message..."
-            className="flex-1 bg-secondary"
+            className="flex-1 bg-secondary text-base"
             disabled={sending}
           />
           <Button 
