@@ -62,10 +62,10 @@ const GeneralChatPage = () => {
     const fetchOrganization = async () => {
       if (!user) return;
 
-      // Get current user's name
+      // Get current user's profile (name + invite_code_id)
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, invite_code_id')
         .eq('user_id', user.id)
         .maybeSingle();
       
@@ -73,8 +73,14 @@ const GeneralChatPage = () => {
         setCurrentUserName(profileData.full_name);
       }
 
+      // Priority 1: Use invite_code_id from profile if available (works for promoted admins and employees)
+      if (profileData?.invite_code_id) {
+        setOrganizationId(profileData.invite_code_id);
+        return;
+      }
+
+      // Priority 2: For admins/creators who don't have invite_code_id, use their active code
       if (isAdmin) {
-        // Admin: get active invite code they created
         const { data } = await supabase
           .from('invite_codes')
           .select('id')
@@ -85,17 +91,6 @@ const GeneralChatPage = () => {
         
         if (data) {
           setOrganizationId(data.id);
-        }
-      } else {
-        // Employee: get their organization from profile
-        const { data } = await supabase
-          .from('profiles')
-          .select('invite_code_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (data?.invite_code_id) {
-          setOrganizationId(data.invite_code_id);
         }
       }
     };
