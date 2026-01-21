@@ -10,8 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Download, Mail, FileText, Table, Loader2 } from 'lucide-react';
+import { Download, Mail, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -23,7 +22,7 @@ interface ExportHistoryDialogProps {
 const ExportHistoryDialog = ({ startDate, endDate }: ExportHistoryDialogProps) => {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
-  const [format, setFormat] = useState<'csv' | 'pdf'>('csv');
+  
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
@@ -42,8 +41,7 @@ const ExportHistoryDialog = ({ startDate, endDate }: ExportHistoryDialogProps) =
       const { data, error } = await supabase.functions.invoke('export-history', {
         body: {
           email,
-          format,
-          startDate: startDate || undefined,
+          format: 'pdf',
           endDate: endDate || undefined
         }
       });
@@ -97,50 +95,13 @@ const ExportHistoryDialog = ({ startDate, endDate }: ExportHistoryDialogProps) =
             />
           </div>
 
-          {/* Format */}
-          <div className="space-y-3">
-            <Label>Format d'export</Label>
-            <RadioGroup
-              value={format}
-              onValueChange={(value) => setFormat(value as 'csv' | 'pdf')}
-              className="grid grid-cols-2 gap-3"
-            >
-              <label 
-                htmlFor="csv" 
-                className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  format === 'csv' 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <RadioGroupItem value="csv" id="csv" />
-                <div className="flex items-center gap-2">
-                  <Table className="w-5 h-5 text-success" />
-                  <div>
-                    <p className="font-medium text-sm">CSV</p>
-                    <p className="text-xs text-muted-foreground">Excel, Sheets</p>
-                  </div>
-                </div>
-              </label>
-              
-              <label 
-                htmlFor="pdf" 
-                className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  format === 'pdf' 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <RadioGroupItem value="pdf" id="pdf" />
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-urgent" />
-                  <div>
-                    <p className="font-medium text-sm">PDF</p>
-                    <p className="text-xs text-muted-foreground">Impression</p>
-                  </div>
-                </div>
-              </label>
-            </RadioGroup>
+          {/* Format info */}
+          <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-primary bg-primary/10">
+            <FileText className="w-5 h-5 text-primary" />
+            <div>
+              <p className="font-medium text-sm">Format PDF</p>
+              <p className="text-xs text-muted-foreground">Document prêt à imprimer</p>
+            </div>
           </div>
 
           {/* Date range info */}
