@@ -48,6 +48,7 @@ interface Intervention {
   status: string;
   created_at: string;
   completed_at: string | null;
+  completion_notes: string | null;
   created_by: string | null;
   intervention_responses: InterventionResponse[];
 }
@@ -82,7 +83,8 @@ const generateCSV = (interventions: Intervention[]): string => {
     'Date de fin',
     'Disponibles',
     'Indisponibles',
-    'Noms des disponibles'
+    'Noms des disponibles',
+    'Notes de fin'
   ];
 
   const rows = interventions.map(intervention => {
@@ -101,7 +103,8 @@ const generateCSV = (interventions: Intervention[]): string => {
       intervention.completed_at ? formatDate(intervention.completed_at) : '',
       availableResponses.length.toString(),
       unavailableCount.toString(),
-      `"${availableNames.replace(/"/g, '""')}"`
+      `"${availableNames.replace(/"/g, '""')}"`,
+      `"${(intervention.completion_notes || '').replace(/"/g, '""')}"`
     ].join(';');
   });
 
@@ -185,7 +188,13 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
   doc.setFontSize(7);
   
   interventions.forEach((intervention, index) => {
-    if (yPos > pageHeight - 25) {
+    // Calculate row height based on whether there are completion notes
+    const hasNotes = intervention.completion_notes && intervention.completion_notes.trim().length > 0;
+    const baseRowHeight = 12;
+    const notesRowHeight = hasNotes ? 10 : 0;
+    const totalRowHeight = baseRowHeight + notesRowHeight;
+    
+    if (yPos > pageHeight - 25 - notesRowHeight) {
       doc.addPage();
       yPos = 20;
       
@@ -216,7 +225,7 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
     } else {
       doc.setFillColor(249, 250, 251);
     }
-    doc.rect(14, yPos - 4, pageWidth - 28, 12, 'F');
+    doc.rect(14, yPos - 4, pageWidth - 28, totalRowHeight, 'F');
     
     doc.setTextColor(31, 41, 55);
     
@@ -255,7 +264,21 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
     const names = availableNames.length > 15 ? availableNames.substring(0, 12) + '...' : (availableNames || '-');
     doc.text(names, colX[5], yPos);
     
-    yPos += 12;
+    yPos += baseRowHeight;
+    
+    // Add completion notes if present
+    if (hasNotes) {
+      doc.setFontSize(6);
+      doc.setTextColor(75, 85, 99);
+      doc.setFont("helvetica", "italic");
+      const notesText = intervention.completion_notes!.length > 120 
+        ? intervention.completion_notes!.substring(0, 117) + '...' 
+        : intervention.completion_notes!;
+      doc.text(`📝 ${notesText}`, 16, yPos - 2);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      yPos += notesRowHeight;
+    }
   });
   
   // Footer on all pages
