@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { recordLogin } from '@/hooks/useLoginHistory';
 import { sendLoginNotification } from '@/services/loginNotifications';
+import { initializeNativePush, isNativeApp } from '@/services/nativePushNotifications';
 import logo from '@/assets/logo.jpg';
 
 type UserRole = 'creator' | 'admin' | 'employee';
@@ -66,6 +67,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Defer backend calls with setTimeout
         setTimeout(() => {
           fetchUserRole(session.user.id);
+          
+          // Initialize native push notifications for iOS/Android
+          if (isNativeApp()) {
+            initializeNativePush(session.user.id);
+          }
         }, 0);
       } else {
         setRole(null);
@@ -85,6 +91,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (session?.user) {
           fetchUserRole(session.user.id);
+          
+          // Initialize native push notifications for iOS/Android
+          if (isNativeApp()) {
+            initializeNativePush(session.user.id);
+          }
         }
       } catch (e) {
         if (!isMounted) return;

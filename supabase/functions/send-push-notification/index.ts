@@ -15,6 +15,13 @@ type DbSubscriptionRow = {
   auth: string;
 };
 
+type FcmTokenRow = {
+  id: string;
+  user_id: string;
+  token: string;
+  platform: string;
+};
+
 type PushTargetSubscription = {
   endpoint: string;
   keys: { p256dh: string; auth: string };
@@ -150,6 +157,160 @@ async function sendEncryptedWebPush(args: {
   await subscriber.pushTextMessage(payload, { ttl, urgency });
 }
 
+// ============ FCM (Firebase Cloud Messaging) Integration ============
+
+interface FcmServiceAccount {
+  type: string;
+  project_id: string;
+  private_key_id: string;
+  private_key: string;
+  client_email: string;
+  client_id: string;
+  auth_uri: string;
+  token_uri: string;
+  auth_provider_x509_cert_url: string;
+  client_x509_cert_url: string;
+  universe_domain: string;
+}
+
+async function getGoogleAccessToken(serviceAccount: FcmServiceAccount): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const expiry = now + 3600;
+
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: serviceAccount.token_uri,
+    iat: now,
+    exp: expiry,
+  };
+
+  const base64Header = btoa(JSON.stringify(header)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const base64Payload = btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unsignedToken = `${base64Header}.${base64Payload}`;
+
+  // Import private key and sign
+  const privateKeyPem = serviceAccount.private_key;
+  const pemContents = privateKeyPem
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\n/g, "");
+  const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    new TextEncoder().encode(unsignedToken),
+  );
+
+  const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const jwt = `${unsignedToken}.${base64Signature}`;
+
+  // Exchange JWT for access token
+  const tokenResponse = await fetch(serviceAccount.token_uri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text();
+    throw new Error(`Failed to get access token: ${errorText}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  return tokenData.access_token;
+}
+
+async function sendFcmNotification(
+  serviceAccount: FcmServiceAccount,
+  accessToken: string,
+  fcmToken: string,
+  title: string,
+  body: string,
+  data: Record<string, string>,
+): Promise<{ success: boolean; error?: string }> {
+  const projectId = serviceAccount.project_id;
+  const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+  const message = {
+    message: {
+      token: fcmToken,
+      notification: {
+        title,
+        body,
+      },
+      data,
+      android: {
+        priority: "high",
+        notification: {
+          channel_id: "medicbike_interventions",
+          sound: "default",
+          default_vibrate_timings: true,
+          default_light_settings: true,
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            "content-available": 1,
+          },
+        },
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
+      },
+    },
+  };
+
+  try {
+    const response = await fetch(fcmUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("FCM error response:", errorText);
+      
+      // Check if token is invalid
+      if (response.status === 404 || errorText.includes("NOT_FOUND") || errorText.includes("UNREGISTERED")) {
+        return { success: false, error: "TOKEN_INVALID" };
+      }
+      
+      return { success: false, error: errorText };
+    }
+
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    console.error("FCM send error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+// ============ Main Handler ============
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -159,6 +320,7 @@ serve(async (req) => {
 
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY") || "";
+    const fcmServiceAccountJson = Deno.env.get("FCM_SERVICE_ACCOUNT") || "";
 
     if (!vapidPublicKey || !vapidPrivateKey) {
       return new Response(JSON.stringify({ error: "VAPID keys not configured" }), {
@@ -434,73 +596,144 @@ serve(async (req) => {
       });
     }
 
-    const { data: subscriptions, error: subError } = await supabase
-      .from("push_subscriptions")
-      .select("*")
-      .in("user_id", userIdsToNotify);
+    // ============ Fetch both Web Push and FCM subscriptions ============
+    const [webPushResult, fcmResult] = await Promise.all([
+      supabase.from("push_subscriptions").select("*").in("user_id", userIdsToNotify),
+      supabase.from("fcm_tokens").select("*").in("user_id", userIdsToNotify),
+    ]);
 
-    if (subError) throw subError;
+    const subscriptions = webPushResult.data || [];
+    const fcmTokens = (fcmResult.data || []) as FcmTokenRow[];
 
-    console.log(`Found ${subscriptions?.length || 0} subscriptions for ${userIdsToNotify.length} users to notify`);
-
-    const vapidKeys = await importVapidKeyPairFromBase64Url(vapidPublicKey, vapidPrivateKey);
-
-    const appServer = await webpush.ApplicationServer.new({
-      contactInformation: "mailto:contact@medicbike.lovable.app",
-      vapidKeys,
-    });
+    console.log(`Found ${subscriptions.length} web push subscriptions and ${fcmTokens.length} FCM tokens for ${userIdsToNotify.length} users`);
 
     // Use computed title/body for departure/arrival notifications
     const finalTitle = (body as any).computedTitle || title;
     const finalBody = (body as any).computedBody || notifBody;
 
-    const payload = buildPayload({
-      title: finalTitle,
-      body: finalBody,
-      urgency,
-      interventionId,
-      type,
-      organizationId,
-      newsId,
-      employeeUserId,
-    });
+    // ============ Send Web Push Notifications ============
+    let webPushSuccessful = 0;
+    
+    if (subscriptions.length > 0) {
+      const vapidKeys = await importVapidKeyPairFromBase64Url(vapidPublicKey, vapidPrivateKey);
 
-    const results = await Promise.allSettled(
-      (subscriptions || []).map(async (sub: DbSubscriptionRow) => {
-        try {
-          const target: PushTargetSubscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
-          await sendEncryptedWebPush({
-            subscription: target,
-            payload,
-            appServer,
-            ttl: 86400,
-            urgency: webpush.Urgency.High,
-          });
-          console.log("Push sent successfully to user:", sub.user_id);
-          return { success: true, userId: sub.user_id };
-        } catch (err: unknown) {
-          if (err instanceof webpush.PushMessageError) {
-            console.error("PushMessageError for user", sub.user_id, ":", err.toString());
-            if (err.isGone()) {
-              console.log("Removing invalid subscription:", sub.id);
-              await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+      const appServer = await webpush.ApplicationServer.new({
+        contactInformation: "mailto:contact@medicbike.lovable.app",
+        vapidKeys,
+      });
+
+      const payload = buildPayload({
+        title: finalTitle,
+        body: finalBody,
+        urgency,
+        interventionId,
+        type,
+        organizationId,
+        newsId,
+        employeeUserId,
+      });
+
+      const webPushResults = await Promise.allSettled(
+        subscriptions.map(async (sub: DbSubscriptionRow) => {
+          try {
+            const target: PushTargetSubscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
+            await sendEncryptedWebPush({
+              subscription: target,
+              payload,
+              appServer,
+              ttl: 86400,
+              urgency: webpush.Urgency.High,
+            });
+            console.log("Web push sent successfully to user:", sub.user_id);
+            return { success: true, userId: sub.user_id };
+          } catch (err: unknown) {
+            if (err instanceof webpush.PushMessageError) {
+              console.error("PushMessageError for user", sub.user_id, ":", err.toString());
+              if (err.isGone()) {
+                console.log("Removing invalid web push subscription:", sub.id);
+                await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+              }
+              return { success: false, status: err.response.status };
             }
-            return { success: false, status: err.response.status };
+
+            const e = err as Error;
+            console.error("Web push error for user", sub.user_id, ":", e?.message || err);
+            return { success: false, error: e?.message || "Unknown" };
           }
+        }),
+      );
 
-          const e = err as Error;
-          console.error("Push error for user", sub.user_id, ":", e?.message || err);
-          return { success: false, error: e?.message || "Unknown" };
-        }
-      }),
-    );
+      webPushSuccessful = webPushResults.filter((r) => r.status === "fulfilled" && (r.value as { success: boolean }).success).length;
+      console.log(`Web push notifications sent: ${webPushSuccessful}/${subscriptions.length}`);
+    }
 
-    const successful = results.filter((r) => r.status === "fulfilled" && (r.value as { success: boolean }).success).length;
+    // ============ Send FCM Notifications (Native iOS/Android) ============
+    let fcmSuccessful = 0;
 
-    console.log(`Notifications sent: ${successful}/${subscriptions?.length || 0}`);
+    if (fcmTokens.length > 0 && fcmServiceAccountJson) {
+      try {
+        const serviceAccount: FcmServiceAccount = JSON.parse(fcmServiceAccountJson);
+        const accessToken = await getGoogleAccessToken(serviceAccount);
+        
+        const fcmData: Record<string, string> = {
+          type: type || "notification",
+          interventionId: interventionId || "",
+          urgency: urgency || "medium",
+          newsId: newsId || "",
+          url: getNotificationUrl(type),
+        };
+
+        const fcmResults = await Promise.allSettled(
+          fcmTokens.map(async (fcm) => {
+            const result = await sendFcmNotification(
+              serviceAccount,
+              accessToken,
+              fcm.token,
+              finalTitle || "Notification",
+              finalBody || "",
+              fcmData,
+            );
+
+            if (result.success) {
+              console.log(`FCM sent successfully to user ${fcm.user_id} (${fcm.platform})`);
+              return { success: true, userId: fcm.user_id };
+            } else {
+              console.error(`FCM error for user ${fcm.user_id}:`, result.error);
+              
+              // Remove invalid tokens
+              if (result.error === "TOKEN_INVALID") {
+                console.log("Removing invalid FCM token:", fcm.id);
+                await supabase.from("fcm_tokens").delete().eq("id", fcm.id);
+              }
+              
+              return { success: false, error: result.error };
+            }
+          }),
+        );
+
+        fcmSuccessful = fcmResults.filter((r) => r.status === "fulfilled" && (r.value as { success: boolean }).success).length;
+        console.log(`FCM notifications sent: ${fcmSuccessful}/${fcmTokens.length}`);
+      } catch (fcmErr) {
+        console.error("FCM initialization error:", fcmErr instanceof Error ? fcmErr.message : fcmErr);
+      }
+    } else if (fcmTokens.length > 0) {
+      console.log("FCM tokens found but FCM_SERVICE_ACCOUNT not configured");
+    }
+
+    const totalSent = webPushSuccessful + fcmSuccessful;
+    const totalSubscriptions = subscriptions.length + fcmTokens.length;
+
+    console.log(`Total notifications sent: ${totalSent}/${totalSubscriptions}`);
 
     return new Response(
-      JSON.stringify({ message: "Notifications sent", total: subscriptions?.length || 0, successful, usersNotified: userIdsToNotify.length }),
+      JSON.stringify({ 
+        message: "Notifications sent", 
+        total: totalSubscriptions, 
+        successful: totalSent,
+        webPush: { total: subscriptions.length, successful: webPushSuccessful },
+        fcm: { total: fcmTokens.length, successful: fcmSuccessful },
+        usersNotified: userIdsToNotify.length,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
