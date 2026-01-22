@@ -216,28 +216,49 @@ serve(async (req) => {
 
     let userIdsToNotify: string[] = [];
 
+    // Helper: Get all creator user IDs (they should receive all notifications)
+    const { data: creatorUsers } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "creator");
+    const creatorIds = (creatorUsers || []).map((c) => c.user_id);
+
     if (type === "login" && organizationId && employeeUserId) {
-      // Login notification: notify admin only
+      // Login notification: notify admin and creators
       const { data: inviteCode } = await supabase.from("invite_codes").select("admin_id").eq("id", organizationId).single();
-      if (inviteCode?.admin_id) userIdsToNotify = [inviteCode.admin_id];
+      if (inviteCode?.admin_id) {
+        userIdsToNotify = [inviteCode.admin_id, ...creatorIds];
+      } else {
+        userIdsToNotify = [...creatorIds];
+      }
     } else if (type === "news" && senderUserId) {
-      // News notification: notify all org members from ALL admin's orgs
+      // News notification: notify all org members from ALL admin's orgs + creators
       const { data: inviteCodes } = await supabase.from("invite_codes").select("id").eq("admin_id", senderUserId);
       const orgIds = (inviteCodes || []).map((ic) => ic.id);
       
+      const allMemberIds: string[] = [...creatorIds];
+      
       if (orgIds.length > 0) {
         const { data: orgMembers } = await supabase.from("profiles").select("user_id").in("invite_code_id", orgIds);
-        userIdsToNotify = (orgMembers || []).map((p) => p.user_id);
+        (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
       }
+      
+      // Remove duplicates and exclude sender
+      userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== senderUserId);
     } else if (type === "chat" && organizationId) {
-      // Chat notification: notify all org members except sender
+      // Chat notification: notify all org members + creators except sender
       const { data: orgProfiles } = await supabase
         .from("profiles")
         .select("user_id")
         .or(`invite_code_id.eq.${organizationId},admin_id.eq.${organizationId}`);
-      userIdsToNotify = (orgProfiles || []).map((p) => p.user_id).filter((id) => id !== excludeUserId);
+      
+      const allMemberIds = (orgProfiles || []).map((p) => p.user_id);
+      // Add creators to receive chat notifications
+      creatorIds.forEach((id) => allMemberIds.push(id));
+      
+      userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== excludeUserId);
     } else if ((type === "departure" || type === "arrival") && senderUserId) {
-      // Departure/Arrival notification: notify ALL members of the sender's organization(s) (except sender)
+      // Departure/Arrival notification: notify ALL members of the sender's organization(s) + creators (except sender)
       console.log(`Processing ${type} notification for sender:`, senderUserId);
       
       // Get sender's name
@@ -262,7 +283,8 @@ serve(async (req) => {
       (body as any).computedTitle = notifTitle;
       (body as any).computedBody = notifMessage;
       
-      const allMemberIds: string[] = [];
+      // Start with creators
+      const allMemberIds: string[] = [...creatorIds];
       
       if (orgId) {
         // Get all org members
