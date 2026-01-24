@@ -501,6 +501,10 @@ serve(async (req) => {
         const orgIds = (inviteCodes || []).map((ic) => ic.id);
         console.log("Sender is admin, org IDs:", orgIds);
 
+        // Always add creators to receive notifications from admins
+        creatorIds.forEach((id) => allMemberIds.push(id));
+        console.log("Added creators to notify:", creatorIds.length);
+
         if (orgIds.length > 0) {
           // Get all members from all organizations
           const { data: orgMembers } = await supabase
@@ -521,6 +525,10 @@ serve(async (req) => {
         
         const orgId = senderProfile?.invite_code_id || null;
         console.log("Sender is employee, org ID:", orgId);
+
+        // Always add creators to receive notifications from employees
+        creatorIds.forEach((id) => allMemberIds.push(id));
+        console.log("Added creators to notify:", creatorIds.length);
 
         if (orgId) {
           // Get all org members
