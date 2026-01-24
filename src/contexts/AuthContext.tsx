@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { recordLogin } from '@/hooks/useLoginHistory';
 import { sendLoginNotification } from '@/services/loginNotifications';
 import { initializeNativePush, isNativeApp } from '@/services/nativePushNotifications';
+import { ensurePushSubscription, isPushSupported } from '@/services/pushNotifications';
 import logo from '@/assets/logo.jpg';
 
 type UserRole = 'creator' | 'admin' | 'employee';
@@ -71,6 +72,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Initialize native push notifications for iOS/Android
           if (isNativeApp()) {
             initializeNativePush(session.user.id);
+          } else if (isPushSupported()) {
+            // Re-sync web push subscription to handle expired subscriptions
+            ensurePushSubscription(session.user.id).catch(console.error);
           }
         }, 0);
       } else {
@@ -95,6 +99,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Initialize native push notifications for iOS/Android
           if (isNativeApp()) {
             initializeNativePush(session.user.id);
+          } else if (isPushSupported()) {
+            // Re-sync web push subscription to handle expired subscriptions
+            ensurePushSubscription(session.user.id).catch(console.error);
           }
         }
       } catch (e) {

@@ -233,17 +233,54 @@ export const getCurrentPushSubscription = async (): Promise<PushSubscription | n
 
 /**
  * Ensures the device is subscribed and the subscription is persisted in DB.
+ * Also checks if the subscription might be stale and refreshes it.
  * Useful after page reloads when Notification.permission is still "granted".
  */
 export const ensurePushSubscription = async (userId: string): Promise<boolean> => {
   const permission = getNotificationPermission();
   if (permission !== 'granted') return false;
 
-  const existing = await getCurrentPushSubscription();
-  // If a subscription exists in the browser, just persist it again to DB.
-  if (existing) {
-    try {
+  try {
+    // Check when the subscription was last saved in DB
+    const { data: existingInDb } = await supabase
+      .from('push_subscriptions')
+      .select('id, created_at, endpoint')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const existing = await getCurrentPushSubscription();
+    
+    // If subscription exists in browser
+    if (existing) {
       const json = existing.toJSON();
+      
+      // Check if this is a different endpoint than what's in DB (new subscription)
+      // or if the DB subscription is older than 5 days (might be stale)
+      const isNewEndpoint = !existingInDb || existingInDb.endpoint !== existing.endpoint;
+      const isStale = existingInDb && 
+        (new Date().getTime() - new Date(existingInDb.created_at).getTime() > 5 * 24 * 60 * 60 * 1000);
+      
+      if (isStale) {
+        console.log('[Push] Subscription is stale (>5 days), refreshing...');
+        // Unsubscribe and create a fresh subscription
+        try {
+          await existing.unsubscribe();
+          // Delete old subscriptions for this user
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('user_id', userId);
+          
+          // Create fresh subscription
+          return await subscribeToPush(userId);
+        } catch (e) {
+          console.error('[Push] Error refreshing stale subscription:', e);
+        }
+      }
+      
+      // Save/update the subscription in DB
       const { error } = await supabase
         .from('push_subscriptions')
         .upsert(
@@ -255,19 +292,25 @@ export const ensurePushSubscription = async (userId: string): Promise<boolean> =
           },
           { onConflict: 'user_id,endpoint' }
         );
+      
       if (error) {
-        console.error('[Push] Error re-saving subscription:', error);
+        console.error('[Push] Error saving subscription:', error);
         return false;
       }
+      
+      if (isNewEndpoint) {
+        console.log('[Push] New endpoint saved to DB');
+      }
       return true;
-    } catch (e) {
-      console.error('[Push] Error re-saving subscription:', e);
-      return false;
     }
-  }
 
-  // Otherwise, create a new subscription.
-  return await subscribeToPush(userId);
+    // No browser subscription exists, create a new one
+    console.log('[Push] No browser subscription found, creating new...');
+    return await subscribeToPush(userId);
+  } catch (e) {
+    console.error('[Push] Error in ensurePushSubscription:', e);
+    return false;
+  }
 };
 
 export const unsubscribeFromPush = async (userId: string): Promise<boolean> => {
