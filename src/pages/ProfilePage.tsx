@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera, Phone } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Mail, Shield, Save, LogOut, Lock, Eye, EyeOff, Camera, Phone, KeyRound } from 'lucide-react';
+import { useTwoFactor } from '@/hooks/useTwoFactor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +11,14 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const passwordSchema = z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères');
 
@@ -26,9 +35,13 @@ const ProfilePage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [verifyingMfa, setVerifyingMfa] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading: authLoading, isAdmin, signOut } = useAuth();
+  const { isEnabled: is2FAEnabled } = useTwoFactor();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -172,6 +185,20 @@ const ProfilePage = () => {
       return;
     }
 
+    // Check if MFA is enabled and AAL level
+    if (is2FAEnabled) {
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalData?.currentLevel !== 'aal2') {
+        // Need to verify MFA first
+        setMfaDialogOpen(true);
+        return;
+      }
+    }
+
+    await performPasswordChange();
+  };
+
+  const performPasswordChange = async () => {
     setChangingPassword(true);
     try {
       const { error } = await supabase.auth.updateUser({
@@ -179,7 +206,12 @@ const ProfilePage = () => {
       });
 
       if (error) {
-        toast.error(error.message);
+        if (error.message.includes('AAL2')) {
+          toast.error('Veuillez vérifier votre 2FA avant de changer le mot de passe');
+          setMfaDialogOpen(true);
+        } else {
+          toast.error(error.message);
+        }
       } else {
         toast.success('Mot de passe mis à jour avec succès');
         setCurrentPassword('');
@@ -190,6 +222,52 @@ const ProfilePage = () => {
       toast.error('Erreur lors du changement de mot de passe');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleMfaVerify = async () => {
+    if (mfaCode.length !== 6) return;
+
+    setVerifyingMfa(true);
+    try {
+      // Get the TOTP factor
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totpFactor = factors?.totp?.[0];
+      
+      if (!totpFactor) {
+        toast.error('Aucun facteur 2FA trouvé');
+        return;
+      }
+
+      // Challenge and verify
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: totpFactor.id
+      });
+
+      if (challengeError) {
+        toast.error('Erreur lors de la vérification');
+        return;
+      }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challenge.id,
+        code: mfaCode
+      });
+
+      if (verifyError) {
+        toast.error('Code invalide');
+        return;
+      }
+
+      // MFA verified, now change password
+      setMfaDialogOpen(false);
+      setMfaCode('');
+      await performPasswordChange();
+    } catch (error) {
+      toast.error('Erreur lors de la vérification 2FA');
+    } finally {
+      setVerifyingMfa(false);
     }
   };
 
@@ -419,6 +497,50 @@ const ProfilePage = () => {
           Se déconnecter
         </Button>
       </main>
+
+      {/* MFA Verification Dialog */}
+      <Dialog open={mfaDialogOpen} onOpenChange={setMfaDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" />
+              Vérification 2FA requise
+            </DialogTitle>
+            <DialogDescription>
+              Pour changer votre mot de passe, veuillez entrer le code de votre application d'authentification.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex flex-col items-center gap-4 py-4">
+            <InputOTP
+              value={mfaCode}
+              onChange={setMfaCode}
+              maxLength={6}
+              onComplete={handleMfaVerify}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+            
+            <Button
+              onClick={handleMfaVerify}
+              disabled={mfaCode.length !== 6 || verifyingMfa}
+              className="w-full"
+            >
+              {verifyingMfa ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Vérifier et changer le mot de passe
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
