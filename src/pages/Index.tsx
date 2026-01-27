@@ -8,7 +8,7 @@ import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { EventsSection } from '@/components/EventsSection';
-import { SystemAlertsSection } from '@/components/SystemAlertsSection';
+
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -241,10 +241,6 @@ const Index = () => {
           <EventsSection />
         </div>
 
-        {/* System Alerts (table alerts) */}
-        <div className="mb-6">
-          <SystemAlertsSection />
-        </div>
 
         {/* Availability Calendar */}
         <AvailabilityCalendar />
