@@ -97,7 +97,7 @@ function getNotificationUrl(type?: string) {
   if (type === "news") return "/news";
   if (type === "login") return "/employees";
   if (type === "departure" || type === "arrival") return "/";
-  if (type === "alert" || type === "emergency") return "/";
+  if (type === "alert" || type === "emergency" || type === "network_alert") return "/";
   return "/";
 }
 
@@ -117,6 +117,7 @@ function getNotificationTag(params: {
   if (type === "arrival") return `arrival-${interventionId ?? "unknown"}`;
   if (type === "alert") return `alert-${alertId ?? "unknown"}`;
   if (type === "emergency") return `emergency-${alertId ?? "unknown"}`;
+  if (type === "network_alert") return `network_alert-${Date.now()}`;
   return `intervention-${interventionId ?? "unknown"}`;
 }
 
@@ -426,8 +427,8 @@ serve(async (req) => {
       creatorIds.forEach((id) => allMemberIds.push(id));
       
       userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== excludeUserId);
-    } else if ((type === "alert" || type === "emergency") && senderUserId) {
-      // Alert/Emergency notification: notify ALL members of the sender's organization + admins + creators (except sender)
+    } else if ((type === "alert" || type === "emergency" || type === "network_alert") && senderUserId) {
+      // Alert/Emergency/Network alert notification: notify ALL members of the sender's organization + admins + creators (except sender)
       console.log(`Processing ${type} notification for sender:`, senderUserId);
       
       // Get sender's organization
