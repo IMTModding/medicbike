@@ -14,9 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const Header = () => {
-  const { signOut, role, isAdmin, user } = useAuth();
+  const { signOut, role, isAdmin, user, isCreator } = useAuth();
   const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const roleLabel = isCreator ? 'Créateur' : isAdmin ? 'Admin' : role ? role : 'Alertes';
 
   useEffect(() => {
     const fetchAvatar = async () => {
@@ -50,7 +52,7 @@ export const Header = () => {
           <div>
             <h1 className="font-bold text-sm sm:text-base text-foreground leading-tight">MEDICBIKE</h1>
             <p className="text-[10px] text-muted-foreground leading-tight">
-              {isAdmin ? 'Admin' : 'Alertes'}
+              {roleLabel}
             </p>
           </div>
         </div>
