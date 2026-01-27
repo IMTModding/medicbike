@@ -20,7 +20,8 @@ export const NetworkAlertButton = () => {
     setSuccess(false);
 
     try {
-      const { error } = await supabase
+      // Insert alert in database (triggers notification via database trigger)
+      const { error: insertError } = await supabase
         .from('alerts')
         .insert({
           user_id: user.id,
@@ -28,7 +29,29 @@ export const NetworkAlertButton = () => {
           status: 'pending',
         });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Also send direct push notification via Edge Function for immediate delivery
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (token) {
+        const response = await supabase.functions.invoke('send-push-notification', {
+          body: {
+            title: '🚨 ALERTE RÉSEAU',
+            body: 'Alerte réseau déclenchée !',
+            type: 'network_alert',
+            urgency: 'high',
+            senderUserId: user.id,
+          },
+        });
+
+        if (response.error) {
+          console.error('Push notification error:', response.error);
+        } else {
+          console.log('Push notification sent successfully:', response.data);
+        }
+      }
 
       setSuccess(true);
       toast.success('Alerte réseau envoyée !');
