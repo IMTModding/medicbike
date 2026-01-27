@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      emergency_alerts: {
+        Row: {
+          created_at: string
+          id: string
+          latitude: number | null
+          localisation: string | null
+          longitude: number | null
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          localisation?: string | null
+          longitude?: number | null
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          localisation?: string | null
+          longitude?: number | null
+          message?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fcm_tokens: {
         Row: {
           created_at: string
