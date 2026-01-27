@@ -7,6 +7,7 @@ import Onboarding from '@/components/Onboarding';
 import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
+import { EventsSection } from '@/components/EventsSection';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -233,6 +234,11 @@ const Index = () => {
             </p>
           </div>
         )}
+
+        {/* Events Section */}
+        <div className="mb-6">
+          <EventsSection />
+        </div>
 
         {/* Availability Calendar */}
         <AvailabilityCalendar />
