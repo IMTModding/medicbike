@@ -42,8 +42,8 @@ export function EventCard({ event, profiles }: EventCardProps) {
   const isUpcoming = isAfter(eventDate, new Date()) || isToday(eventDate);
   const isPast = isBefore(eventDate, new Date()) && !isToday(eventDate);
   
-  // Creators can manage ANY event, admins can only manage their own
-  const canManage = isCreator || (isAdmin && event.admin_id === user?.id);
+  // Creators can manage ANY event, admins can manage their organization's events
+  const canManage = isCreator || isAdmin;
 
   const availableCount = availabilities.filter(a => a.status === 'available').length;
   const maybeCount = availabilities.filter(a => a.status === 'maybe').length;
