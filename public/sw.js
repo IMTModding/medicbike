@@ -20,34 +20,43 @@ self.addEventListener("message", function (event) {
 });
 
 self.addEventListener("push", function (event) {
-  console.log("[SW] Push received");
+  console.log("[SW] Push received at:", new Date().toISOString());
   
   var data = {
     title: "Nouvelle intervention",
     body: "Une nouvelle alerte a été créée",
-    icon: "/logo.jpg",
+    icon: "/pwa-192x192.png",
     badge: "/notification-badge.png",
-    tag: "intervention",
+    tag: "intervention-" + Date.now(),
     data: { url: "/" },
   };
 
   try {
     if (event.data) {
       var payload = event.data.json();
-      console.log("[SW] Push payload:", payload);
+      console.log("[SW] Push payload:", JSON.stringify(payload));
       data = Object.assign({}, data, payload);
     }
   } catch (e) {
     console.error("[SW] Error parsing push data:", e);
+    // Try text parsing as fallback
+    try {
+      var textData = event.data ? event.data.text() : null;
+      console.log("[SW] Raw push text:", textData);
+    } catch (e2) {
+      console.error("[SW] Error reading push text:", e2);
+    }
   }
 
   var options = {
-    body: data.body,
-    icon: data.icon || "/logo.jpg",
+    body: data.body || "Nouvelle notification",
+    icon: data.icon || "/pwa-192x192.png",
     badge: data.badge || "/notification-badge.png",
-    tag: data.tag || "default",
-    vibrate: [200, 100, 200, 100, 200],
+    tag: data.tag || ("notification-" + Date.now()),
+    vibrate: [300, 100, 300, 100, 300],
     requireInteraction: data.requireInteraction !== false,
+    renotify: true,
+    silent: false,
     data: data.data || { url: "/" },
     actions: [
       { action: "open", title: "Ouvrir" },
@@ -55,8 +64,17 @@ self.addEventListener("push", function (event) {
     ]
   };
 
-  console.log("[SW] Showing notification:", data.title);
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  console.log("[SW] Showing notification:", data.title, "options:", JSON.stringify(options));
+  
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Notification", options)
+      .then(function() {
+        console.log("[SW] Notification shown successfully");
+      })
+      .catch(function(err) {
+        console.error("[SW] Failed to show notification:", err);
+      })
+  );
 });
 
 self.addEventListener("notificationclick", function (event) {
