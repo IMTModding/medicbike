@@ -12,7 +12,8 @@ import {
   HelpCircle,
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileDown
 } from 'lucide-react';
 import { format, parseISO, isAfter, isBefore, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -21,6 +22,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { exportEventPDF } from '@/utils/pdfExport';
+import { toast } from 'sonner';
 
 interface EventCardProps {
   event: Event;
@@ -50,6 +53,23 @@ export function EventCard({ event, profiles }: EventCardProps) {
     await deleteEvent(event.id);
     setDeleting(false);
     setDeleteDialogOpen(false);
+  };
+
+  const handleExportPDF = () => {
+    try {
+      // Convert availabilities to the format expected by exportEventPDF
+      const availabilitiesForExport = availabilities.map(a => ({
+        user_id: a.user_id,
+        status: a.status as 'available' | 'maybe' | 'unavailable',
+        notes: a.notes
+      }));
+      
+      exportEventPDF(event, availabilitiesForExport, profiles || new Map());
+      toast.success('PDF exporté avec succès');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Erreur lors de l\'export PDF');
+    }
   };
 
   const getStatusBadge = () => {
@@ -126,16 +146,27 @@ export function EventCard({ event, profiles }: EventCardProps) {
               </div>
               <CardTitle className="text-lg line-clamp-2">{event.title}</CardTitle>
             </div>
-            {canManage && (
+            <div className="flex items-center gap-1 shrink-0">
               <Button 
                 size="icon" 
                 variant="ghost" 
-                className="text-destructive hover:text-destructive shrink-0"
-                onClick={() => setDeleteDialogOpen(true)}
+                className="text-muted-foreground hover:text-foreground"
+                onClick={handleExportPDF}
+                title="Exporter en PDF"
               >
-                <Trash2 className="h-4 w-4" />
+                <FileDown className="h-4 w-4" />
               </Button>
-            )}
+              {canManage && (
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         
