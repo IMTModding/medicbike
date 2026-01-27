@@ -3,8 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { recordLogin } from '@/hooks/useLoginHistory';
 import { sendLoginNotification } from '@/services/loginNotifications';
-import { initializeNativePush, isNativeApp } from '@/services/nativePushNotifications';
 import { ensurePushSubscription, isPushSupported } from '@/services/pushNotifications';
+import { Capacitor } from '@capacitor/core';
 import logo from '@/assets/logo.jpg';
 
 type UserRole = 'creator' | 'admin' | 'employee';
@@ -69,11 +69,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(() => {
           fetchUserRole(session.user.id);
           
-          // Initialize native push notifications for iOS/Android
-          if (isNativeApp()) {
-            initializeNativePush(session.user.id);
-          } else if (isPushSupported()) {
-            // Re-sync web push subscription to handle expired subscriptions
+          // Only handle web push here - native push is handled by NativePushProvider
+          if (!Capacitor.isNativePlatform() && isPushSupported()) {
             ensurePushSubscription(session.user.id).catch(console.error);
           }
         }, 0);
@@ -96,11 +93,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           fetchUserRole(session.user.id);
           
-          // Initialize native push notifications for iOS/Android
-          if (isNativeApp()) {
-            initializeNativePush(session.user.id);
-          } else if (isPushSupported()) {
-            // Re-sync web push subscription to handle expired subscriptions
+          // Only handle web push here - native push is handled by NativePushProvider
+          if (!Capacitor.isNativePlatform() && isPushSupported()) {
             ensurePushSubscription(session.user.id).catch(console.error);
           }
         }
