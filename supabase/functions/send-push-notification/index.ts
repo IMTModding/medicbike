@@ -433,34 +433,58 @@ serve(async (req) => {
       creatorIds.forEach((id) => allMemberIds.push(id));
       
       userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== excludeUserId);
-    } else if (type === "event" && organizationId && senderUserId) {
+    } else if (type === "event" && senderUserId) {
       // Event notification: notify all org members + creators (except creator of the event)
-      console.log("Processing event notification for organization:", organizationId);
+      console.log("Processing event notification, organizationId:", organizationId, "senderUserId:", senderUserId);
       
       const allMemberIds: string[] = [...creatorIds];
       
-      // Get all members of this organization
-      const { data: orgMembers } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("invite_code_id", organizationId);
-      
-      (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
-      
-      // Get admin of the organization
-      const { data: inviteCode } = await supabase
-        .from("invite_codes")
-        .select("admin_id")
-        .eq("id", organizationId)
-        .maybeSingle();
-      
-      if (inviteCode?.admin_id) {
-        allMemberIds.push(inviteCode.admin_id);
+      // If organizationId is provided, use it directly
+      if (organizationId) {
+        // Get all members of this organization
+        const { data: orgMembers } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("invite_code_id", organizationId);
+        
+        (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+        
+        // Get admin of the organization
+        const { data: inviteCode } = await supabase
+          .from("invite_codes")
+          .select("admin_id")
+          .eq("id", organizationId)
+          .maybeSingle();
+        
+        if (inviteCode?.admin_id) {
+          allMemberIds.push(inviteCode.admin_id);
+        }
+      } else {
+        // No organizationId - get all orgs from the sender (admin) and notify their members
+        const { data: adminInviteCodes } = await supabase
+          .from("invite_codes")
+          .select("id, admin_id")
+          .eq("admin_id", senderUserId);
+        
+        const orgIds = (adminInviteCodes || []).map((ic) => ic.id);
+        console.log("Admin's organization IDs:", orgIds);
+        
+        if (orgIds.length > 0) {
+          const { data: orgMembers } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .in("invite_code_id", orgIds);
+          
+          (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+        }
+        
+        // Also add the sender admin (they might not be in profiles with invite_code_id)
+        allMemberIds.push(senderUserId);
       }
       
       // Remove duplicates and exclude sender (the admin who created the event)
       userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== senderUserId);
-      console.log(`Users to notify for event:`, userIdsToNotify.length);
+      console.log(`Users to notify for event:`, userIdsToNotify.length, userIdsToNotify);
     } else if ((type === "alert" || type === "emergency" || type === "network_alert") && senderUserId) {
       // Alert/Emergency/Network alert notification: notify ALL members of the sender's organization + admins + creators (except sender)
       console.log(`Processing ${type} notification for sender:`, senderUserId);
