@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PresenceProvider } from "@/contexts/PresenceContext";
 import { RealtimeNotificationProvider } from "@/components/RealtimeNotificationProvider";
+import { NativePushProvider } from "@/components/NativePushProvider";
 import { PWAUpdateBanner } from "@/components/PWAUpdateBanner";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import Index from "./pages/Index";
@@ -38,9 +39,10 @@ const App = () => {
           <PWAUpdateBanner />
           <BrowserRouter>
             <CookieConsentBanner />
-            <PresenceProvider>
-              <RealtimeNotificationProvider>
-                <Routes>
+            <NativePushProvider>
+              <PresenceProvider>
+                <RealtimeNotificationProvider>
+                  <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin" element={<AdminDashboard />} />
@@ -59,9 +61,10 @@ const App = () => {
                   <Route path="/docs" element={<TechnicalDocsPage />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
-                </Routes>
-              </RealtimeNotificationProvider>
-            </PresenceProvider>
+                  </Routes>
+                </RealtimeNotificationProvider>
+              </PresenceProvider>
+            </NativePushProvider>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
