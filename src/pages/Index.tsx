@@ -8,6 +8,7 @@ import { IndexPageSkeleton } from '@/components/PageSkeleton';
 import OfflineBanner from '@/components/OfflineBanner';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 import { EmergencyAlertButton } from '@/components/EmergencyAlertButton';
+import { NetworkAlertButton } from '@/components/NetworkAlertButton';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -242,6 +243,11 @@ const Index = () => {
         <div className="mt-6">
           <h2 className="text-lg font-semibold text-foreground mb-3">Test d'alerte</h2>
           <EmergencyAlertButton />
+        </div>
+
+        {/* Network Alert Button */}
+        <div className="mt-4">
+          <NetworkAlertButton />
         </div>
 
       </main>
