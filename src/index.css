@@ -121,7 +121,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     /* Prevent pull-to-refresh on mobile */
     overscroll-behavior-y: contain;
-    /* Prevent text selection on touch */
+    /* Prevent text selection on touch (mobile only) */
     -webkit-user-select: none;
     user-select: none;
     /* Smooth touch scrolling */
@@ -131,6 +131,17 @@
     /* Fix for mobile browsers showing address bar */
     min-height: 100vh;
     min-height: 100dvh;
+    /* Ensure vertical scroll works on desktop */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Allow text selection on desktop */
+  @media (hover: hover) and (pointer: fine) {
+    body {
+      -webkit-user-select: auto;
+      user-select: auto;
+    }
   }
 
   /* Allow text selection in inputs and textareas */
@@ -347,8 +358,15 @@
 
 /* Prevent content overflow in landscape */
 @media screen and (orientation: landscape) {
-  html, body {
+  html {
     overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
     width: 100%;
     max-width: 100vw;
   }
