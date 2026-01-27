@@ -636,6 +636,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_locations: { Args: never; Returns: undefined }
       generate_invite_code: { Args: never; Returns: string }
       get_organization_profiles: {
         Args: { p_user_id: string }
