@@ -45,45 +45,89 @@ export async function registerNativePush(userId: string): Promise<boolean> {
   try {
     // Request permission
     const permissionResult = await PushNotifications.requestPermissions();
-    
+
     if (permissionResult.receive !== "granted") {
       console.log("Push notification permission denied");
       return false;
     }
 
-    // Register with APNs/FCM
-    await PushNotifications.register();
+    // IMPORTANT: attach listeners BEFORE calling register().
+    // On some devices the "registration" event can fire immediately.
+    return await new Promise((resolve) => {
+      let settled = false;
+      let timeoutId: number | undefined;
 
-    // Listen for registration
-    return new Promise((resolve) => {
-      PushNotifications.addListener("registration", async (token) => {
+      const settle = async (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (typeof timeoutId === "number") window.clearTimeout(timeoutId);
+        try {
+          // Best-effort cleanup to avoid stacking listeners across app opens.
+          await Promise.all([
+            registrationHandle?.remove?.(),
+            registrationErrorHandle?.remove?.(),
+            receivedHandle?.remove?.(),
+            actionHandle?.remove?.(),
+          ]);
+        } catch {
+          // ignore
+        }
+        resolve(ok);
+      };
+
+      const registrationHandlePromise = PushNotifications.addListener("registration", async (token) => {
         console.log("FCM/APNs token received:", token.value);
-        
-        // Save token to database
         const saved = await saveFcmToken(userId, token.value);
-        resolve(saved);
+        await settle(saved);
       });
 
-      PushNotifications.addListener("registrationError", (error) => {
+      const registrationErrorHandlePromise = PushNotifications.addListener("registrationError", async (error) => {
         console.error("Push registration error:", error);
-        resolve(false);
+        await settle(false);
       });
 
-      // Set up notification listeners
-      PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      // Set up notification listeners (these don't block registration)
+      const receivedHandlePromise = PushNotifications.addListener("pushNotificationReceived", (notification) => {
         console.log("Push notification received:", notification);
-        // You can show a local notification or update UI here
       });
 
-      PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
+      const actionHandlePromise = PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
         console.log("Push notification action performed:", notification);
-        // Handle notification tap - navigate to appropriate page
         const data = notification.notification.data;
         if (data?.url) {
           window.location.href = data.url;
         } else if (data?.interventionId) {
           window.location.href = `/`;
         }
+      });
+
+      // Resolve listener handles for cleanup
+      let registrationHandle: any;
+      let registrationErrorHandle: any;
+      let receivedHandle: any;
+      let actionHandle: any;
+
+      Promise.all([registrationHandlePromise, registrationErrorHandlePromise, receivedHandlePromise, actionHandlePromise])
+        .then(([h1, h2, h3, h4]) => {
+          registrationHandle = h1;
+          registrationErrorHandle = h2;
+          receivedHandle = h3;
+          actionHandle = h4;
+        })
+        .catch(() => {
+          // ignore
+        });
+
+      // Timeout so we don't hang forever if the platform never returns a token
+      timeoutId = window.setTimeout(() => {
+        console.error("Native push registration timed out");
+        void settle(false);
+      }, 15000);
+
+      // Register with APNs/FCM AFTER listeners are attached
+      PushNotifications.register().catch((err) => {
+        console.error("PushNotifications.register() failed:", err);
+        void settle(false);
       });
     });
   } catch (error) {
