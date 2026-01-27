@@ -54,9 +54,9 @@ export function CreateEventDialog({ onSuccess }: CreateEventDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nouvel événement
+        <Button className="gap-2 w-full sm:w-auto flex-shrink-0">
+          <Plus className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">Nouvel événement</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

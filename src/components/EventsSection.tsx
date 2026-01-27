@@ -46,10 +46,10 @@ export function EventsSection() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-primary" />
-          Événements & Manifestations
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg sm:text-2xl">
+          <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
+          <span>Événements</span>
         </CardTitle>
         {(isAdmin || isCreator) && <CreateEventDialog />}
       </CardHeader>
