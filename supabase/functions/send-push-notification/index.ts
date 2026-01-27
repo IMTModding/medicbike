@@ -97,6 +97,7 @@ function getNotificationUrl(type?: string) {
   if (type === "news") return "/news";
   if (type === "login") return "/employees";
   if (type === "departure" || type === "arrival") return "/";
+  if (type === "alert" || type === "emergency") return "/";
   return "/";
 }
 
@@ -106,13 +107,16 @@ function getNotificationTag(params: {
   newsId?: string;
   employeeUserId?: string;
   interventionId?: string;
+  alertId?: string;
 }) {
-  const { type, organizationId, newsId, employeeUserId, interventionId } = params;
+  const { type, organizationId, newsId, employeeUserId, interventionId, alertId } = params;
   if (type === "chat") return `chat-${organizationId ?? "unknown"}`;
   if (type === "news") return `news-${newsId ?? "unknown"}`;
   if (type === "login") return `login-${employeeUserId ?? "unknown"}`;
   if (type === "departure") return `departure-${interventionId ?? "unknown"}`;
   if (type === "arrival") return `arrival-${interventionId ?? "unknown"}`;
+  if (type === "alert") return `alert-${alertId ?? "unknown"}`;
+  if (type === "emergency") return `emergency-${alertId ?? "unknown"}`;
   return `intervention-${interventionId ?? "unknown"}`;
 }
 
@@ -125,21 +129,23 @@ function buildPayload(input: {
   organizationId?: string;
   newsId?: string;
   employeeUserId?: string;
+  alertId?: string;
 }) {
-  const { title, body, urgency, interventionId, type, organizationId, newsId, employeeUserId } = input;
+  const { title, body, urgency, interventionId, type, organizationId, newsId, employeeUserId, alertId } = input;
 
   return JSON.stringify({
     title: title ?? "Notification",
     body: body ?? "",
     icon: "/pwa-192x192.png",
     badge: "/pwa-192x192.png",
-    tag: getNotificationTag({ type, organizationId, newsId, employeeUserId, interventionId }),
-    requireInteraction: urgency === "high",
+    tag: getNotificationTag({ type, organizationId, newsId, employeeUserId, interventionId, alertId }),
+    requireInteraction: urgency === "high" || type === "emergency",
     data: {
       interventionId,
       urgency,
       type,
       newsId,
+      alertId,
       url: getNotificationUrl(type),
     },
   });
@@ -344,6 +350,7 @@ serve(async (req) => {
       newsId,
       senderUserId: providedSenderUserId,
       employeeUserId,
+      alertId,
     } = body;
 
     let senderUserId = providedSenderUserId as string | undefined;
@@ -419,6 +426,43 @@ serve(async (req) => {
       creatorIds.forEach((id) => allMemberIds.push(id));
       
       userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== excludeUserId);
+    } else if ((type === "alert" || type === "emergency") && senderUserId) {
+      // Alert/Emergency notification: notify ALL members of the sender's organization + admins + creators (except sender)
+      console.log(`Processing ${type} notification for sender:`, senderUserId);
+      
+      // Get sender's organization
+      const { data: senderProfile } = await supabase
+        .from("profiles")
+        .select("invite_code_id")
+        .eq("user_id", senderUserId)
+        .maybeSingle();
+      
+      const orgId = senderProfile?.invite_code_id;
+      
+      // Start with creators
+      const allMemberIds: string[] = [...creatorIds];
+      
+      if (orgId) {
+        // Get all org members
+        const { data: orgMembers } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("invite_code_id", orgId);
+        
+        // Get admin of the org
+        const { data: adminProfile } = await supabase
+          .from("invite_codes")
+          .select("admin_id")
+          .eq("id", orgId)
+          .maybeSingle();
+        
+        (orgMembers || []).forEach((p) => allMemberIds.push(p.user_id));
+        if (adminProfile?.admin_id) allMemberIds.push(adminProfile.admin_id);
+      }
+      
+      // Remove duplicates and exclude sender
+      userIdsToNotify = [...new Set(allMemberIds)].filter((id) => id !== senderUserId);
+      console.log(`Users to notify for ${type}:`, userIdsToNotify.length);
     } else if ((type === "departure" || type === "arrival") && senderUserId) {
       // Departure/Arrival notification: notify ALL members of the sender's organization(s) + creators (except sender)
       console.log(`Processing ${type} notification for sender:`, senderUserId);
@@ -639,6 +683,7 @@ serve(async (req) => {
         organizationId,
         newsId,
         employeeUserId,
+        alertId,
       });
 
       const webPushResults = await Promise.allSettled(
