@@ -166,9 +166,16 @@ export const NativePushProvider = ({ children }: NativePushProviderProps) => {
 
         // Registration success listener
         await PushNotifications.addListener('registration', async (token) => {
+          // Log the FULL token for Firebase testing - easy to copy from console
+          console.log('═══════════════════════════════════════════════════════════');
+          console.log('🔔 FCM/APNs TOKEN RECEIVED - COPY THIS FOR FIREBASE TESTING:');
+          console.log('═══════════════════════════════════════════════════════════');
+          console.log(token.value);
+          console.log('═══════════════════════════════════════════════════════════');
+          
           debugLog('FCM/APNs token received!', { 
-            tokenLength: token.value?.length, 
-            tokenPreview: token.value?.substring(0, 30) + '...' 
+            tokenLength: token.value?.length,
+            platform
           });
           
           // If user is already logged in, save the token immediately
