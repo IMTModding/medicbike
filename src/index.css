@@ -112,28 +112,43 @@
     text-size-adjust: 100%;
     /* Smooth scrolling */
     scroll-behavior: smooth;
-    /* Safe area insets for notched devices */
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    /* CRITICAL: Enable scrolling on html element */
+    overflow-y: scroll !important;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    /* Prevent pull-to-refresh on mobile */
-    overscroll-behavior-y: contain;
-    /* Prevent text selection on touch (mobile only) */
-    -webkit-user-select: none;
-    user-select: none;
-    /* Smooth touch scrolling */
-    -webkit-overflow-scrolling: touch;
-    /* Prevent tap highlight on Android */
-    -webkit-tap-highlight-color: transparent;
     /* Fix for mobile browsers showing address bar */
     min-height: 100vh;
     min-height: 100dvh;
-    /* Ensure vertical scroll works on desktop */
-    overflow-y: auto;
+    /* CRITICAL: Enable scrolling - use scroll instead of auto for better compatibility */
+    overflow-y: scroll !important;
     overflow-x: hidden;
+    /* Prevent tap highlight on Android */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Mobile-only restrictions */
+  @media (hover: none) and (pointer: coarse) {
+    body {
+      /* Prevent pull-to-refresh on mobile */
+      overscroll-behavior-y: contain;
+      /* Prevent text selection on touch (mobile only) */
+      -webkit-user-select: none;
+      user-select: none;
+      /* Smooth touch scrolling */
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Desktop scrolling - ensure it works */
+  @media (hover: hover) and (pointer: fine) {
+    html, body {
+      overflow-y: scroll !important;
+      height: auto !important;
+    }
   }
 
   /* Allow text selection on desktop */
