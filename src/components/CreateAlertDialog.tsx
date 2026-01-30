@@ -323,9 +323,6 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-foreground">Intervention Urgente</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Accident, urgence médicale nécessitant une réponse immédiate
-                    </p>
                   </div>
                   <span className="text-2xl">🚨</span>
                 </button>
@@ -345,9 +342,6 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-foreground">Intervention Générale</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Intervention planifiée, assistance non urgente
-                    </p>
                   </div>
                   <span className="text-2xl">ℹ️</span>
                 </button>
