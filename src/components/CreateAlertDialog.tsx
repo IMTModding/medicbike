@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Navigation, Bike, User, Trash2 } from 'lucide-react';
+import { Plus, AlertTriangle, MapPin, FileText, Loader2, CheckCircle2, Sparkles, Navigation, Bike, User, Trash2, ArrowLeft, Siren, Info } from 'lucide-react';
 import { createIntervention, Urgency } from '@/services/interventions';
 import { sendPushNotification } from '@/services/pushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,18 +32,23 @@ interface Assignment {
   vehicleId: string;
 }
 
+type InterventionCategory = 'urgent' | 'general' | null;
+
 export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [category, setCategory] = useState<InterventionCategory>(null);
   const [title, setTitle] = useState('');
   const [numero, setNumero] = useState('');
   const [rue, setRue] = useState('');
   const [codePostal, setCodePostal] = useState('');
   const [ville, setVille] = useState('');
   const [description, setDescription] = useState('');
-  const [urgency] = useState<Urgency>('high');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  
+  // Urgency is derived from category
+  const urgency: Urgency = category === 'urgent' ? 'high' : 'low';
   
   // New state for assignments
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -190,7 +195,9 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
       }
 
       // Send push notification to all employees
-      const notifTitle = `🚨 URGENT: ${title.trim()}`;
+      const notifTitle = category === 'urgent' 
+        ? `🚨 URGENT: ${title.trim()}`
+        : `ℹ️ GÉNÉRAL: ${title.trim()}`;
       
       await sendPushNotification(
         notifTitle,
@@ -229,6 +236,7 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setLoading(false);
     setSuccess(false);
     setFocusedField(null);
+    setCategory(null);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -282,14 +290,96 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
               Les notifications sont en cours d'envoi...
             </p>
           </div>
+        ) : !category ? (
+          // Category selection screen
+          <div className="animate-in fade-in-0 zoom-in-95 duration-300">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-foreground">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Plus className="w-4 h-4 text-primary" />
+                </div>
+                <span>Type d'intervention</span>
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 mt-6">
+              <p className="text-sm text-muted-foreground text-center">
+                Sélectionnez le type d'intervention à créer
+              </p>
+              
+              <div className="grid gap-3">
+                {/* Urgent intervention button */}
+                <button
+                  type="button"
+                  onClick={() => setCategory('urgent')}
+                  className={cn(
+                    "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200",
+                    "bg-red-500/5 border-red-500/30 hover:border-red-500 hover:bg-red-500/10",
+                    "text-left group"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Siren className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Intervention Urgente</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Accident, urgence médicale nécessitant une réponse immédiate
+                    </p>
+                  </div>
+                  <span className="text-2xl">🚨</span>
+                </button>
+                
+                {/* General intervention button */}
+                <button
+                  type="button"
+                  onClick={() => setCategory('general')}
+                  className={cn(
+                    "flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-200",
+                    "bg-blue-500/5 border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/10",
+                    "text-left group"
+                  )}
+                >
+                  <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Info className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Intervention Générale</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Intervention planifiée, assistance non urgente
+                    </p>
+                  </div>
+                  <span className="text-2xl">ℹ️</span>
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-foreground">
-                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCategory(null)}
+                  className="h-8 w-8 mr-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center",
+                  category === 'urgent' ? "bg-red-500/10" : "bg-blue-500/10"
+                )}>
+                  {category === 'urgent' ? (
+                    <Siren className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <Info className="w-4 h-4 text-blue-500" />
+                  )}
                 </div>
-                <span>Nouvelle alerte urgente</span>
+                <span>
+                  {category === 'urgent' ? 'Intervention urgente' : 'Intervention générale'}
+                </span>
               </DialogTitle>
             </DialogHeader>
             
@@ -499,10 +589,20 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 )}
               </div>
               
-              {/* Urgency Badge - Fixed to Urgent */}
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                <span className="text-lg">🔴</span>
-                <span className="text-sm font-medium text-red-500">Alerte Urgente</span>
+              {/* Category Badge - Dynamic based on selection */}
+              <div className={cn(
+                "flex items-center gap-2 p-3 rounded-lg border",
+                category === 'urgent' 
+                  ? "bg-red-500/10 border-red-500/30" 
+                  : "bg-blue-500/10 border-blue-500/30"
+              )}>
+                <span className="text-lg">{category === 'urgent' ? '🔴' : '🔵'}</span>
+                <span className={cn(
+                  "text-sm font-medium",
+                  category === 'urgent' ? "text-red-500" : "text-blue-500"
+                )}>
+                  {category === 'urgent' ? 'Alerte Urgente' : 'Alerte Générale'}
+                </span>
               </div>
               
               {/* Action Buttons */}
