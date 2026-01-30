@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check, Car, Loader2 } from 'lucide-react';
+import { MapPin, Clock, AlertTriangle, CheckCircle2, XCircle, Navigation, Check, Car, Loader2, Bike, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Intervention } from '@/services/interventions';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,14 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isNativeApp, startBackgroundTracking, stopBackgroundTracking } from '@/services/backgroundLocation';
+
+interface Assignment {
+  id: string;
+  user_id: string;
+  vehicle_id: string | null;
+  profile?: { full_name: string | null };
+  vehicle?: { name: string };
+}
 
 interface AlertCardProps {
   intervention: Intervention;
@@ -130,6 +138,7 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
   const [showConfirmComplete, setShowConfirmComplete] = useState(false);
   const [isDeparting, setIsDeparting] = useState(false);
   const [hasArrived, setHasArrived] = useState(false);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const watchIdRef = useRef<number | null>(null);
   const arrivalNotifiedRef = useRef(false);
   const urgencyConfig = getUrgencyConfig(intervention.urgency);
@@ -137,6 +146,47 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
   
   const isResponded = intervention.userStatus === 'available' || intervention.userStatus === 'unavailable';
   const hasDeparted = intervention.userStatus === 'available';
+
+  // Fetch assignments for this intervention
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      const { data, error } = await supabase
+        .from('intervention_assignments')
+        .select('id, user_id, vehicle_id')
+        .eq('intervention_id', intervention.id);
+
+      if (error) {
+        console.error('Error fetching assignments:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Fetch profiles and vehicles
+        const userIds = data.map(a => a.user_id);
+        const vehicleIds = data.filter(a => a.vehicle_id).map(a => a.vehicle_id);
+
+        const [profilesRes, vehiclesRes] = await Promise.all([
+          supabase.from('profiles').select('user_id, full_name').in('user_id', userIds),
+          vehicleIds.length > 0 
+            ? supabase.from('vehicles').select('id, name').in('id', vehicleIds)
+            : Promise.resolve({ data: [] })
+        ]);
+
+        const profiles = profilesRes.data || [];
+        const vehicles = vehiclesRes.data || [];
+
+        const enrichedAssignments: Assignment[] = data.map(a => ({
+          ...a,
+          profile: profiles.find(p => p.user_id === a.user_id),
+          vehicle: vehicles.find(v => v.id === a.vehicle_id),
+        }));
+
+        setAssignments(enrichedAssignments);
+      }
+    };
+
+    fetchAssignments();
+  }, [intervention.id]);
 
   // Check arrival based on GPS
   const checkArrival = (userLat: number, userLon: number) => {
@@ -409,6 +459,36 @@ export const AlertCard = ({ intervention, onStatusChange, onComplete }: AlertCar
         <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
           {intervention.description}
         </p>
+      )}
+
+      {/* Assignments Section - Show assigned employees and vehicles */}
+      {assignments.length > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Bike className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">Équipe assignée</span>
+          </div>
+          <div className="space-y-1.5">
+            {assignments.map(assignment => (
+              <div 
+                key={assignment.id}
+                className="flex items-center gap-2 text-sm"
+              >
+                <User className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-medium text-foreground">
+                  {assignment.profile?.full_name || 'Inconnu'}
+                </span>
+                {assignment.vehicle && (
+                  <>
+                    <span className="text-muted-foreground">→</span>
+                    <Bike className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">{assignment.vehicle.name}</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Location with GPS Button */}
