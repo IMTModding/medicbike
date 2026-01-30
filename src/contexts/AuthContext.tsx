@@ -51,21 +51,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // Increase timeout to 15 seconds for slow mobile networks
-    const timeoutId = window.setTimeout(() => {
-      if (!isMounted) return;
-      // Don't set error - just finish loading and let user proceed
-      // This prevents blocking users on slow connections
-      setLoading(false);
-    }, 15000);
-
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST - this is critical for session persistence
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] State change:', event, session?.user?.email);
+      
+      // Update state synchronously
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Clear loading on any auth state change
+      if (isMounted) {
+        setLoading(false);
+      }
 
       if (session?.user) {
-        // Defer backend calls with setTimeout
+        // Defer backend calls with setTimeout to avoid blocking
         setTimeout(() => {
           fetchUserRole(session.user.id);
           
@@ -79,35 +79,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    (async () => {
+    // THEN check for existing session
+    const initSession = async () => {
       try {
-        // THEN check for existing session
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.warn('[Auth] getSession error:', error.message);
+        }
+        
         if (!isMounted) return;
 
-        window.clearTimeout(timeoutId);
+        console.log('[Auth] Initial session:', session?.user?.email || 'none');
 
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Only set if we don't already have a session from onAuthStateChange
+        if (!user) {
+          setSession(session);
+          setUser(session?.user ?? null);
 
-        if (session?.user) {
-          fetchUserRole(session.user.id);
-          
-          // Only handle web push here - native push is handled by NativePushProvider
-          if (!Capacitor.isNativePlatform() && isPushSupported()) {
-            ensurePushSubscription(session.user.id).catch(console.error);
+          if (session?.user) {
+            fetchUserRole(session.user.id);
+            
+            // Only handle web push here - native push is handled by NativePushProvider
+            if (!Capacitor.isNativePlatform() && isPushSupported()) {
+              ensurePushSubscription(session.user.id).catch(console.error);
+            }
           }
         }
       } catch (e) {
-        if (!isMounted) return;
-        window.clearTimeout(timeoutId);
-        // Don't block - let user continue to login page
-        console.warn('Auth init error:', e);
+        console.warn('[Auth] Init error:', e);
       } finally {
-        if (!isMounted) return;
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initSession();
+
+    // Fallback timeout for very slow networks (30 seconds)
+    const timeoutId = window.setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('[Auth] Timeout reached, stopping loading');
         setLoading(false);
       }
-    })();
+    }, 30000);
 
     return () => {
       isMounted = false;
