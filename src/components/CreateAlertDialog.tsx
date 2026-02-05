@@ -496,92 +496,94 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
                 />
               </div>
 
-              {/* Vehicle Assignments Section */}
-              <div className="space-y-3">
-                <label className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Bike className="w-3.5 h-3.5" />
-                  Affectation motos (optionnel)
-                </label>
+              {/* Vehicle Assignments Section - Only for urgent interventions */}
+              {category === 'urgent' && (
+                <div className="space-y-3">
+                  <label className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Bike className="w-3.5 h-3.5" />
+                    Affectation motos (optionnel)
+                  </label>
 
-                {/* Current assignments */}
-                {assignments.length > 0 && (
-                  <div className="space-y-2">
-                    {assignments.map(assignment => (
-                      <div 
-                        key={assignment.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20"
-                      >
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="w-4 h-4 text-primary" />
-                          <span className="font-medium">{getEmployeeName(assignment.userId)}</span>
-                          <span className="text-muted-foreground">→</span>
-                          <Bike className="w-4 h-4 text-primary" />
-                          <span>{getVehicleName(assignment.vehicleId)}</span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAssignment(assignment.id)}
-                          className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
+                  {/* Current assignments */}
+                  {assignments.length > 0 && (
+                    <div className="space-y-2">
+                      {assignments.map(assignment => (
+                        <div 
+                          key={assignment.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="w-4 h-4 text-primary" />
+                            <span className="font-medium">{getEmployeeName(assignment.userId)}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <Bike className="w-4 h-4 text-primary" />
+                            <span>{getVehicleName(assignment.vehicleId)}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAssignment(assignment.id)}
+                            className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                {/* Add new assignment */}
-                {vehicles.length > 0 && employees.length > 0 ? (
-                  <div className="flex gap-2">
-                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                      <SelectTrigger className="flex-1 bg-secondary border-border">
-                        <SelectValue placeholder="Employé" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableEmployees.map(employee => (
-                          <SelectItem key={employee.user_id} value={employee.user_id}>
-                            {employee.full_name || 'Sans nom'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Add new assignment */}
+                  {vehicles.length > 0 && employees.length > 0 ? (
+                    <div className="flex gap-2">
+                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                        <SelectTrigger className="flex-1 bg-secondary border-border">
+                          <SelectValue placeholder="Employé" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableEmployees.map(employee => (
+                            <SelectItem key={employee.user_id} value={employee.user_id}>
+                              {employee.full_name || 'Sans nom'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                    <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
-                      <SelectTrigger className="flex-1 bg-secondary border-border">
-                        <SelectValue placeholder="Moto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableVehicles.map(vehicle => (
-                          <SelectItem key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
+                        <SelectTrigger className="flex-1 bg-secondary border-border">
+                          <SelectValue placeholder="Moto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableVehicles.map(vehicle => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={addAssignment}
-                      disabled={!selectedEmployee || !selectedVehicle}
-                      className="shrink-0"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : vehicles.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">
-                    Aucune moto configurée. Ajoutez des motos dans les paramètres.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">
-                    Aucun employé disponible.
-                  </p>
-                )}
-              </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={addAssignment}
+                        disabled={!selectedEmployee || !selectedVehicle}
+                        className="shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : vehicles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      Aucune moto configurée. Ajoutez des motos dans les paramètres.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      Aucun employé disponible.
+                    </p>
+                  )}
+                </div>
+              )}
               
               {/* Category Badge - Dynamic based on selection */}
               <div className={cn(
