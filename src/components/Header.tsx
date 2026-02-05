@@ -44,7 +44,7 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border safe-top">
+    <header className="sticky top-0 z-50 bg-gradient-to-r from-background/95 via-card/90 to-background/95 backdrop-blur-lg border-b border-border/50 safe-top shadow-lg shadow-black/10">
       <div className="container flex items-center justify-between h-14 sm:h-16 px-4 gap-2">
         {/* Logo and title - fixed width */}
         <div className="flex items-center gap-2 shrink-0">

@@ -22,6 +22,7 @@ import {
 import { Intervention } from '@/services/interventions';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, CheckCircle2, Clock, Loader2, ChevronRight, Newspaper } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 
 const Index = () => {
@@ -146,9 +147,10 @@ const Index = () => {
         )}
         {/* News Banner */}
         {latestNews.length > 0 && (
-          <div 
+          <Card 
+            variant="glass"
             onClick={() => navigate('/news')}
-            className="mb-6 bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+            className="mb-6 overflow-hidden cursor-pointer hover:border-primary/50"
           >
             <div className="flex items-center gap-3 p-3 bg-primary/10">
               <Newspaper className="w-5 h-5 text-primary" />
@@ -173,34 +175,34 @@ const Index = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Intervention Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-card rounded-xl p-3 border border-border">
+          <Card variant="glass" className="p-3">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="w-4 h-4 text-primary" />
               <span className="text-xs text-muted-foreground">En attente</span>
             </div>
             <p className="text-2xl font-bold text-foreground">{pendingCount}</p>
-          </div>
+          </Card>
           
-          <div className="bg-card rounded-xl p-3 border border-border">
+          <Card variant={urgentCount > 0 ? "urgent" : "glass"} className="p-3">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-urgent" />
               <span className="text-xs text-muted-foreground">Urgentes</span>
             </div>
             <p className="text-2xl font-bold text-urgent">{urgentCount}</p>
-          </div>
+          </Card>
           
-          <div className="bg-card rounded-xl p-3 border border-border">
+          <Card variant={availableCount > 0 ? "success" : "glass"} className="p-3">
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 className="w-4 h-4 text-success" />
               <span className="text-xs text-muted-foreground">Acceptées</span>
             </div>
             <p className="text-2xl font-bold text-success">{availableCount}</p>
-          </div>
+          </Card>
         </div>
 
         {/* Section Title */}
