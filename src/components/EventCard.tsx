@@ -76,9 +76,9 @@ export function EventCard({ event, profiles }: EventCardProps) {
   const getStatusBadge = () => {
     switch (event.status) {
       case 'upcoming':
-        return <Badge variant="default" className="bg-blue-500">À venir</Badge>;
+        return <Badge variant="default">À venir</Badge>;
       case 'ongoing':
-        return <Badge variant="default" className="bg-green-500">En cours</Badge>;
+        return <Badge variant="success">En cours</Badge>;
       case 'completed':
         return <Badge variant="secondary">Terminé</Badge>;
       case 'cancelled':
@@ -131,8 +131,7 @@ export function EventCard({ event, profiles }: EventCardProps) {
 
   return (
     <>
-      <Card className={cn(
-        'transition-all',
+      <Card variant={isPast ? "flat" : "elevated"} className={cn(
         isPast && 'opacity-60',
         event.status === 'cancelled' && 'border-destructive/50'
       )}>
