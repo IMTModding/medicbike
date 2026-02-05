@@ -28,6 +28,7 @@
     --popover-foreground: 210 20% 98%;
 
     --primary: 45 100% 50%;
+    --primary-glow: 38 100% 55%;
     --primary-foreground: 222 47% 11%;
 
     --secondary: 222 40% 20%;
@@ -40,25 +41,31 @@
     --accent-foreground: 210 20% 98%;
 
     --destructive: 0 72% 51%;
+    --destructive-glow: 15 85% 55%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 76% 36%;
+    --success-glow: 152 80% 42%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
+    --warning-glow: 28 95% 55%;
     --warning-foreground: 0 0% 0%;
 
     /* Admin accent (violet) */
     --admin: 270 90% 62%;
     --admin-strong: 270 92% 52%;
+    --admin-glow: 280 85% 70%;
     --admin-foreground: 0 0% 100%;
 
     /* Creator accent (red) - highest privilege */
     --creator: 0 84% 60%;
     --creator-strong: 0 90% 50%;
+    --creator-glow: 330 85% 65%;
     --creator-foreground: 0 0% 100%;
 
     --urgent: 0 84% 60%;
+    --urgent-glow: 15 90% 55%;
     --urgent-foreground: 0 0% 100%;
 
     --border: 222 40% 22%;
@@ -66,6 +73,17 @@
     --ring: 45 100% 50%;
 
     --radius: 0.75rem;
+    
+    /* Gradient definitions */
+    --gradient-primary: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(38 100% 55%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(152 80% 42%) 100%);
+    --gradient-destructive: linear-gradient(135deg, hsl(0 72% 51%) 0%, hsl(15 85% 55%) 100%);
+    --gradient-urgent: linear-gradient(135deg, hsl(0 84% 60%) 0%, hsl(15 90% 55%) 100%);
+    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(28 95% 55%) 100%);
+    --gradient-admin: linear-gradient(135deg, hsl(270 90% 62%) 0%, hsl(280 85% 70%) 100%);
+    --gradient-creator: linear-gradient(135deg, hsl(0 84% 60%) 0%, hsl(330 85% 65%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(222 47% 16%) 0%, hsl(222 47% 12%) 100%);
+    --gradient-glass: linear-gradient(135deg, hsla(222 47% 20% / 0.8) 0%, hsla(222 47% 14% / 0.9) 100%);
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -85,6 +103,7 @@
     --popover: 222 47% 14%;
     --popover-foreground: 210 20% 98%;
     --primary: 45 100% 50%;
+    --primary-glow: 38 100% 55%;
     --primary-foreground: 222 47% 11%;
     --secondary: 222 40% 20%;
     --secondary-foreground: 210 20% 98%;
@@ -93,7 +112,18 @@
     --accent: 222 40% 25%;
     --accent-foreground: 210 20% 98%;
     --destructive: 0 72% 51%;
+    --destructive-glow: 15 85% 55%;
     --destructive-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-glow: 152 80% 42%;
+    --warning: 38 92% 50%;
+    --warning-glow: 28 95% 55%;
+    --admin: 270 90% 62%;
+    --admin-glow: 280 85% 70%;
+    --creator: 0 84% 60%;
+    --creator-glow: 330 85% 65%;
+    --urgent: 0 84% 60%;
+    --urgent-glow: 15 90% 55%;
     --border: 222 40% 22%;
     --input: 222 40% 22%;
     --ring: 45 100% 50%;
