@@ -21,6 +21,7 @@ export default {
         foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
+          glow: "hsl(var(--primary-glow))",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
@@ -29,28 +30,34 @@ export default {
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
+          glow: "hsl(var(--destructive-glow))",
           foreground: "hsl(var(--destructive-foreground))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
+          glow: "hsl(var(--success-glow))",
           foreground: "hsl(var(--success-foreground))",
         },
         warning: {
           DEFAULT: "hsl(var(--warning))",
+          glow: "hsl(var(--warning-glow))",
           foreground: "hsl(var(--warning-foreground))",
         },
         admin: {
           DEFAULT: "hsl(var(--admin))",
           strong: "hsl(var(--admin-strong))",
+          glow: "hsl(var(--admin-glow))",
           foreground: "hsl(var(--admin-foreground))",
         },
         creator: {
           DEFAULT: "hsl(var(--creator))",
           strong: "hsl(var(--creator-strong))",
+          glow: "hsl(var(--creator-glow))",
           foreground: "hsl(var(--creator-foreground))",
         },
         urgent: {
           DEFAULT: "hsl(var(--urgent))",
+          glow: "hsl(var(--urgent-glow))",
           foreground: "hsl(var(--urgent-foreground))",
         },
         muted: {
