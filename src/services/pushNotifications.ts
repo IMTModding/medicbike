@@ -160,14 +160,14 @@ export const subscribeToPush = async (userId: string): Promise<boolean> => {
 
     // Step 5: Get or create subscription
     console.log('[Push] Step 5: Getting/creating subscription...');
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await (registration as any).pushManager.getSubscription();
     console.log('[Push] Existing subscription:', subscription ? 'yes' : 'no');
 
     if (!subscription) {
       try {
         console.log('[Push] Creating new subscription with VAPID...');
         const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource;
-        subscription = await registration.pushManager.subscribe({
+        subscription = await (registration as any).pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey,
         });
@@ -224,7 +224,7 @@ export const getCurrentPushSubscription = async (): Promise<PushSubscription | n
   try {
     if (!('serviceWorker' in navigator)) return null;
     const registration = await navigator.serviceWorker.ready;
-    return await registration.pushManager.getSubscription();
+    return await (registration as any).pushManager.getSubscription();
   } catch (error) {
     console.error('[Push] Error getting push subscription:', error);
     return null;
@@ -316,7 +316,7 @@ export const ensurePushSubscription = async (userId: string): Promise<boolean> =
 export const unsubscribeFromPush = async (userId: string): Promise<boolean> => {
   try {
     const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
+    const subscription = await (registration as any).pushManager.getSubscription();
 
     if (subscription) {
       await subscription.unsubscribe();
