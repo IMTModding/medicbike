@@ -1,14 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
-// Base64 encode helper for Deno
-function toBase64(str: string): string {
-  return btoa(unescape(encodeURIComponent(str)));
-}
 
 // Convert ArrayBuffer to base64
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -22,15 +14,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-interface ExportRequest {
-  email: string;
-  format: "csv" | "pdf";
-  startDate?: string;
-  endDate?: string;
-}
 
 interface InterventionResponse {
   id: string;
@@ -73,44 +58,6 @@ const getUrgencyLabel = (urgency: string): string => {
   }
 };
 
-const generateCSV = (interventions: Intervention[]): string => {
-  const headers = [
-    'Titre',
-    'Description',
-    'Lieu',
-    'Urgence',
-    'Date de création',
-    'Date de fin',
-    'Disponibles',
-    'Indisponibles',
-    'Noms des disponibles',
-    'Notes de fin'
-  ];
-
-  const rows = interventions.map(intervention => {
-    const availableResponses = intervention.intervention_responses.filter(r => r.status === 'available');
-    const unavailableCount = intervention.intervention_responses.filter(r => r.status === 'unavailable').length;
-    const availableNames = availableResponses
-      .map(r => r.profiles?.full_name || 'Utilisateur')
-      .join(', ');
-
-    return [
-      `"${intervention.title.replace(/"/g, '""')}"`,
-      `"${(intervention.description || '').replace(/"/g, '""')}"`,
-      `"${intervention.location.replace(/"/g, '""')}"`,
-      getUrgencyLabel(intervention.urgency),
-      formatDate(intervention.created_at),
-      intervention.completed_at ? formatDate(intervention.completed_at) : '',
-      availableResponses.length.toString(),
-      unavailableCount.toString(),
-      `"${availableNames.replace(/"/g, '""')}"`,
-      `"${(intervention.completion_notes || '').replace(/"/g, '""')}"`
-    ].join(';');
-  });
-
-  return [headers.join(';'), ...rows].join('\n');
-};
-
 const generatePDF = (interventions: Intervention[], startDate?: string, endDate?: string): ArrayBuffer => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -142,7 +89,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
   doc.setTextColor(33, 37, 41);
   doc.setFillColor(248, 250, 252);
   
-  // Box 1: Total interventions
   doc.roundedRect(14, 50, 85, 25, 3, 3, 'F');
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
@@ -153,7 +99,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
   doc.setFont("helvetica", "normal");
   doc.text('Interventions terminées', 56, 70, { align: 'center' });
   
-  // Box 2: Total available
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(110, 50, 85, 25, 3, 3, 'F');
   doc.setFontSize(18);
@@ -183,18 +128,15 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
   
   yPos += 10;
   
-  // Table rows
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   
   interventions.forEach((intervention, index) => {
-    // Calculate row height based on whether there are notes or available employees
     const hasNotes = intervention.completion_notes && intervention.completion_notes.trim().length > 0;
     const availableResponses = intervention.intervention_responses.filter(r => r.status === 'available');
     const hasAvailableEmployees = availableResponses.length > 0;
     const showDetails = hasNotes || hasAvailableEmployees;
     const baseRowHeight = 12;
-    // Add more height if both notes and employees are shown
     const notesRowHeight = showDetails ? (hasNotes && hasAvailableEmployees ? 14 : 10) : 0;
     const totalRowHeight = baseRowHeight + notesRowHeight;
     
@@ -202,7 +144,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
       doc.addPage();
       yPos = 20;
       
-      // Re-draw header on new page
       doc.setFillColor(248, 250, 252);
       doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
       doc.setFontSize(8);
@@ -222,7 +163,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
       .slice(0, 2)
       .join(', ');
     
-    // Alternating row colors
     if (index % 2 === 0) {
       doc.setFillColor(255, 255, 255);
     } else {
@@ -232,15 +172,12 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
     
     doc.setTextColor(31, 41, 55);
     
-    // Title (truncated)
     const title = intervention.title.length > 25 ? intervention.title.substring(0, 22) + '...' : intervention.title;
     doc.text(title, colX[0], yPos);
     
-    // Location (truncated)
     const location = intervention.location.length > 18 ? intervention.location.substring(0, 15) + '...' : intervention.location;
     doc.text(location, colX[1], yPos);
     
-    // Urgency with color
     const urgencyLabel = getUrgencyLabel(intervention.urgency);
     if (intervention.urgency === 'high') {
       doc.setTextColor(239, 68, 68);
@@ -252,24 +189,19 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
     doc.text(urgencyLabel, colX[2], yPos);
     
     doc.setTextColor(31, 41, 55);
-    
-    // Date
     doc.text(formatDate(intervention.created_at).split(' ')[0], colX[3], yPos);
     
-    // Dispo/Indispo
     doc.setTextColor(34, 197, 94);
     doc.text(`${availableResponses.length}`, colX[4], yPos);
     doc.setTextColor(107, 114, 128);
     doc.text(`/${unavailableCount}`, colX[4] + 6, yPos);
     
     doc.setTextColor(31, 41, 55);
-    // Names (truncated)
     const names = availableNames.length > 15 ? availableNames.substring(0, 12) + '...' : (availableNames || '-');
     doc.text(names, colX[5], yPos);
     
     yPos += baseRowHeight;
     
-    // Show available employees and notes
     const allAvailableEmployeeNames = availableResponses
       .map(r => r.profiles?.full_name || 'Utilisateur')
       .join(', ');
@@ -281,7 +213,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
       
       let noteLineYPos = yPos - 2;
       
-      // Show available employees
       if (hasAvailableEmployees) {
         const employeesText = `Intervenants (${availableResponses.length}): ${allAvailableEmployeeNames}`;
         const truncatedEmployees = employeesText.length > 120 
@@ -291,7 +222,6 @@ const generatePDF = (interventions: Intervention[], startDate?: string, endDate?
         noteLineYPos += 4;
       }
       
-      // Show completion notes
       if (hasNotes) {
         const notesText = intervention.completion_notes!.length > 100 
           ? intervention.completion_notes!.substring(0, 97) + '...' 
@@ -333,7 +263,6 @@ serve(async (req: Request): Promise<Response> => {
     // ========== AUTHENTICATION CHECK ==========
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: "Authentification requise" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -341,8 +270,6 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
-    // Create a client with the user's token to verify authentication
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
@@ -359,7 +286,7 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`Authenticated user: ${user.id}`);
 
-    // ========== AUTHORIZATION CHECK - Admin or Creator ==========
+    // ========== AUTHORIZATION CHECK ==========
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: roleData, error: roleError } = await supabase
@@ -389,65 +316,27 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log(`User has permission (creator: ${isCreator}), proceeding with export`);
 
-    // ========== GET ADMIN'S ORGANIZATION INFO ==========
-    const { data: adminProfile, error: profileError } = await supabase
-      .from("profiles")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (profileError) {
-      console.error("Error getting admin profile:", profileError.message);
-    }
-
-    // Get all invite codes created by this admin
-    const { data: adminInviteCodes, error: inviteError } = await supabase
+    // ========== GET ORGANIZATION INFO ==========
+    const { data: adminInviteCodes } = await supabase
       .from("invite_codes")
       .select("id")
       .eq("admin_id", user.id);
 
-    if (inviteError) {
-      console.error("Error getting admin invite codes:", inviteError.message);
-    }
-
     const inviteCodeIds = adminInviteCodes?.map(ic => ic.id) || [];
 
-    // Get all users in admin's organization (employees who used admin's invite codes)
-    const { data: orgUsers, error: orgError } = await supabase
+    const { data: orgUsers } = await supabase
       .from("profiles")
       .select("user_id")
       .or(`admin_id.eq.${user.id}${inviteCodeIds.length > 0 ? `,invite_code_id.in.(${inviteCodeIds.join(",")})` : ""}`);
 
-    if (orgError) {
-      console.error("Error getting org users:", orgError.message);
-    }
-
-    // List of user IDs in this admin's organization (including the admin)
     const orgUserIds = [...new Set([user.id, ...(orgUsers?.map(u => u.user_id) || [])])];
-
     console.log(`Admin organization has ${orgUserIds.length} users`);
 
     // ========== PROCESS REQUEST ==========
-    const { email, format, startDate, endDate }: ExportRequest = await req.json();
-    console.log(`Exporting ${format} to ${email}, dates: ${startDate} - ${endDate}`);
+    const { startDate, endDate } = await req.json();
+    console.log(`Exporting PDF, dates: ${startDate} - ${endDate}`);
 
-    if (!email || !format) {
-      return new Response(
-        JSON.stringify({ error: "Email et format requis" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({ error: "Format d'email invalide" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ========== FETCH INTERVENTIONS - ONLY FROM ADMIN'S ORGANIZATION ==========
+    // ========== FETCH INTERVENTIONS ==========
     let query = supabase
       .from('interventions')
       .select(`
@@ -459,7 +348,7 @@ serve(async (req: Request): Promise<Response> => {
         )
       `)
       .eq('status', 'completed')
-      .in('created_by', orgUserIds) // Only interventions created by users in this organization
+      .in('created_by', orgUserIds)
       .order('completed_at', { ascending: false });
 
     if (startDate) {
@@ -478,9 +367,9 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error(`Erreur de récupération: ${fetchError.message}`);
     }
 
-    console.log(`Found ${interventions?.length || 0} interventions for this organization`);
+    console.log(`Found ${interventions?.length || 0} interventions`);
 
-    // Get all unique user IDs from responses to fetch their profiles
+    // Get profiles for response users
     const allResponseUserIds = new Set<string>();
     (interventions || []).forEach((intervention: any) => {
       (intervention.intervention_responses || []).forEach((r: any) => {
@@ -488,7 +377,6 @@ serve(async (req: Request): Promise<Response> => {
       });
     });
 
-    // Fetch profiles for all response users
     let userProfilesMap: Record<string, string> = {};
     if (allResponseUserIds.size > 0) {
       const { data: profiles } = await supabase
@@ -501,7 +389,6 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    // Map interventions with profile names
     const typedInterventions: Intervention[] = (interventions || []).map((intervention: any) => ({
       ...intervention,
       intervention_responses: (intervention.intervention_responses || []).map((r: any) => ({
@@ -510,58 +397,15 @@ serve(async (req: Request): Promise<Response> => {
       }))
     }));
 
-    let attachment;
-    let filename: string;
-    let mimeType: string;
-
-    if (format === "csv") {
-      const csvContent = generateCSV(typedInterventions);
-      // Add BOM for Excel UTF-8 compatibility
-      const csvWithBOM = '\uFEFF' + csvContent;
-      attachment = toBase64(csvWithBOM);
-      filename = `historique-interventions-${new Date().toISOString().split('T')[0]}.csv`;
-      mimeType = "text/csv";
-    } else {
-      const pdfBuffer = generatePDF(typedInterventions, startDate, endDate);
-      attachment = arrayBufferToBase64(pdfBuffer);
-      filename = `historique-interventions-${new Date().toISOString().split('T')[0]}.pdf`;
-      mimeType = "application/pdf";
-    }
-
-    const dateRangeText = startDate || endDate 
-      ? `${startDate ? `du ${formatDate(startDate)}` : ''} ${endDate ? `au ${formatDate(endDate)}` : ''}`
-      : 'complet';
-
-    const emailResponse = await resend.emails.send({
-      from: "Interventions <onboarding@resend.dev>",
-      to: [email],
-      subject: `Export historique des interventions - ${typedInterventions.length} intervention(s)`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #3b82f6;">📊 Export de l'historique</h1>
-          <p>Bonjour,</p>
-          <p>Veuillez trouver ci-joint l'export de l'historique des interventions ${dateRangeText}.</p>
-          <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <p style="margin: 0;"><strong>📋 ${typedInterventions.length}</strong> intervention(s) terminée(s)</p>
-            <p style="margin: 10px 0 0 0;"><strong>📄 Format:</strong> ${format.toUpperCase()}</p>
-          </div>
-          <p>Cordialement,<br>Le système de gestion des interventions</p>
-        </div>
-      `,
-      attachments: [
-        {
-          filename,
-          content: attachment,
-        }
-      ]
-    });
-
-    console.log("Email sent successfully:", emailResponse);
+    // ========== GENERATE PDF AND RETURN AS BASE64 ==========
+    const pdfBuffer = generatePDF(typedInterventions, startDate, endDate);
+    const pdfBase64 = arrayBufferToBase64(pdfBuffer);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Export envoyé à ${email}`,
+        pdf: pdfBase64,
+        filename: `historique-interventions-${new Date().toISOString().split('T')[0]}.pdf`,
         count: typedInterventions.length 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
