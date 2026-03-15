@@ -267,15 +267,15 @@ const HistoryPage = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border pt-[env(safe-area-inset-top)]">
         <div className="container flex items-center justify-between h-14 px-3">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => selectionMode ? cancelSelectionMode() : navigate('/')}
-              className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+              className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors shrink-0"
             >
-              {selectionMode ? <X className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+              {selectionMode ? <X className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             </button>
-            <div>
-              <h1 className="font-bold text-lg text-foreground">
+            <div className="min-w-0">
+              <h1 className="font-bold text-base text-foreground truncate">
                 {selectionMode ? `${selectedIds.size} sélectionnée(s)` : 'Historique'}
               </h1>
               <p className="text-xs text-muted-foreground">
