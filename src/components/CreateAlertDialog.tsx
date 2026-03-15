@@ -142,6 +142,24 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     }
   };
 
+  // Geocode an address using Nominatim
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=fr&limit=1`,
+        { headers: { 'Accept-Language': 'fr' } }
+      );
+      if (!response.ok) return null;
+      const results = await response.json();
+      if (results.length > 0) {
+        return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -153,7 +171,13 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
     setLoading(true);
     
     try {
-      // Create intervention
+      // Auto-geocode the address to get GPS coordinates
+      const coords = await geocodeAddress(fullAddress);
+      if (!coords) {
+        console.warn('Geocoding failed for address:', fullAddress);
+      }
+
+      // Create intervention with coordinates
       const { data: interventionData, error: interventionError } = await supabase
         .from('interventions')
         .insert({
@@ -162,6 +186,8 @@ export const CreateAlertDialog = ({ onCreated }: CreateAlertDialogProps) => {
           description: description.trim() || null,
           urgency,
           created_by: user.id,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
         })
         .select('id')
         .single();
