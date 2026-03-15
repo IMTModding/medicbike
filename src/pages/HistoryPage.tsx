@@ -81,6 +81,7 @@ const HistoryPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedIntervention, setSelectedIntervention] = useState<{
     id: string;
     title: string;
