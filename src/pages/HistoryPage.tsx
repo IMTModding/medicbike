@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHistoryInterventions, useInterventionEvents } from '@/hooks/useInterventions';
@@ -21,7 +21,9 @@ import {
   Car,
   Target,
   FileText,
-  Edit3
+  Edit3,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,6 +81,7 @@ const HistoryPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedIntervention, setSelectedIntervention] = useState<{
     id: string;
     title: string;
@@ -203,6 +206,15 @@ const HistoryPage = () => {
   }, [filteredInterventions, isAdmin, isCreator, user]);
 
   const canEditNotes = isAdmin || isCreator;
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const openNotesDialog = (intervention: any) => {
     setSelectedIntervention({
@@ -457,7 +469,7 @@ const HistoryPage = () => {
               <div 
                 key={intervention.id}
                 className={cn(
-                  "bg-card rounded-xl border border-border p-4 transition-colors",
+                  "bg-card rounded-xl border border-border overflow-hidden transition-colors",
                   selectionMode && "cursor-pointer",
                   selectionMode && selectedIds.has(intervention.id) && "border-primary bg-primary/5"
                 )}
@@ -465,7 +477,7 @@ const HistoryPage = () => {
               >
                 {/* Selection checkbox */}
                 {selectionMode && (
-                  <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
+                  <div className="flex items-center gap-3 px-4 pt-3 pb-2 border-b border-border">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -484,155 +496,163 @@ const HistoryPage = () => {
                     </span>
                   </div>
                 )}
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
+
+                {/* Compact header - always visible */}
+                <button
+                  className="w-full text-left p-4 flex items-center gap-3"
+                  onClick={(e) => {
+                    if (selectionMode) return;
+                    e.stopPropagation();
+                    toggleExpanded(intervention.id);
+                  }}
+                >
                   <span className={cn(
-                    "text-xs font-medium px-2 py-0.5 rounded-full border",
+                    "text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0",
                     urgencyConfig.className
                   )}>
                     {urgencyConfig.label}
                   </span>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <CheckCircle2 className="w-3 h-3 text-success" />
-                    <span>Terminée</span>
-                  </div>
-                </div>
-
-                {/* Title */}
-                <h3 className="font-semibold text-foreground mb-1">
-                  {intervention.title}
-                </h3>
-
-                {/* Description */}
-                {intervention.description && (
-                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                    {intervention.description}
-                  </p>
-                )}
-
-                {/* Location */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                  <MapPin className="w-4 h-4 text-primary" />
-                  <span className="truncate">{intervention.location}</span>
-                </div>
-
-                {/* Metadata */}
-                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-3">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>Créée le {format(new Date(intervention.created_at), 'dd/MM/yyyy', { locale: fr })}</span>
-                  </div>
-                  {completedDate && (
-                    <div className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-success" />
-                      <span>Terminée le {completedDate}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Response Summary */}
-                <div className="bg-secondary/50 rounded-lg p-3">
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-success" />
-                      <span className="text-success font-medium">{availableCount} dispo</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <XCircle className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        {intervention.responses.filter(r => r.status === 'unavailable').length} indispo
-                      </span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground text-sm truncate">
+                      {intervention.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <MapPin className="w-3 h-3 text-primary shrink-0" />
+                      <span className="truncate">{intervention.location}</span>
+                      <span className="shrink-0 ml-auto">{completedDate ? format(new Date(intervention.completed_at!), 'dd/MM/yy', { locale: fr }) : ''}</span>
                     </div>
                   </div>
-                  
-                  {intervention.responses.length > 0 && (
-                    <div className="space-y-1">
-                      {intervention.responses
-                        .filter(r => r.status === 'available')
-                        .slice(0, 3)
-                        .map(response => (
-                          <div 
-                            key={response.id}
-                            className="text-xs text-foreground"
-                          >
-                            ✓ {response.profile?.full_name || 'Utilisateur'}
-                          </div>
-                        ))}
-                      {intervention.responses.filter(r => r.status === 'available').length > 3 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{intervention.responses.filter(r => r.status === 'available').length - 3} autre(s)
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Completion Notes */}
-                {(intervention.completion_notes || canEditNotes) && !selectionMode && (
-                  <div className="mt-3 bg-accent/30 rounded-lg p-3 border border-accent">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-primary" />
-                        Notes de fin d'intervention
-                      </h4>
-                      {canEditNotes && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openNotesDialog(intervention);
-                          }}
-                          className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                          {intervention.completion_notes ? 'Modifier' : 'Ajouter'}
-                        </button>
-                      )}
-                    </div>
-                    {intervention.completion_notes ? (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {intervention.completion_notes}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">
-                        Aucune note ajoutée
-                      </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-success font-medium">{availableCount}✓</span>
+                    {!selectionMode && (
+                      expandedIds.has(intervention.id) 
+                        ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        : <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
-                )}
+                </button>
 
-                {/* Departure/Arrival Events */}
-                {eventsMap[intervention.id] && eventsMap[intervention.id].length > 0 && (
-                  <div className="mt-3 bg-primary/5 rounded-lg p-3 border border-primary/20">
-                    <h4 className="text-xs font-medium text-primary mb-2 flex items-center gap-1.5">
-                      <Car className="w-3.5 h-3.5" />
-                      Chronologie des déplacements
-                    </h4>
-                    <div className="space-y-1.5">
-                      {eventsMap[intervention.id].map(event => (
-                        <div 
-                          key={event.id}
-                          className="flex items-center gap-2 text-xs"
-                        >
-                          {event.event_type === 'departure' ? (
-                            <Car className="w-3 h-3 text-warning" />
-                          ) : (
-                            <Target className="w-3 h-3 text-success" />
-                          )}
-                          <span className={cn(
-                            "font-medium",
-                            event.event_type === 'departure' ? "text-warning" : "text-success"
-                          )}>
-                            {event.event_type === 'departure' ? 'Départ' : 'Arrivée'}
-                          </span>
-                          <span className="text-foreground">
-                            {event.profile?.full_name || 'Utilisateur'}
-                          </span>
-                          <span className="text-muted-foreground ml-auto">
-                            {format(new Date(event.created_at), 'HH:mm', { locale: fr })}
+                {/* Expandable details */}
+                {expandedIds.has(intervention.id) && !selectionMode && (
+                  <div className="px-4 pb-4 border-t border-border pt-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                    {/* Description */}
+                    {intervention.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {intervention.description}
+                      </p>
+                    )}
+
+                    {/* Metadata */}
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Créée le {format(new Date(intervention.created_at), 'dd/MM/yyyy', { locale: fr })}</span>
+                      </div>
+                      {completedDate && (
+                        <div className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-success" />
+                          <span>Terminée le {completedDate}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Response Summary */}
+                    <div className="bg-secondary/50 rounded-lg p-3">
+                      <div className="flex items-center gap-4 mb-2">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-success" />
+                          <span className="text-success font-medium">{availableCount} dispo</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <XCircle className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {intervention.responses.filter(r => r.status === 'unavailable').length} indispo
                           </span>
                         </div>
-                      ))}
+                      </div>
+                      
+                      {intervention.responses.length > 0 && (
+                        <div className="space-y-1">
+                          {intervention.responses
+                            .filter(r => r.status === 'available')
+                            .slice(0, 3)
+                            .map(response => (
+                              <div key={response.id} className="text-xs text-foreground">
+                                ✓ {response.profile?.full_name || 'Utilisateur'}
+                              </div>
+                            ))}
+                          {intervention.responses.filter(r => r.status === 'available').length > 3 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{intervention.responses.filter(r => r.status === 'available').length - 3} autre(s)
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Completion Notes */}
+                    {(intervention.completion_notes || canEditNotes) && (
+                      <div className="bg-accent/30 rounded-lg p-3 border border-accent">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-primary" />
+                            Notes de fin
+                          </h4>
+                          {canEditNotes && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openNotesDialog(intervention);
+                              }}
+                              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              {intervention.completion_notes ? 'Modifier' : 'Ajouter'}
+                            </button>
+                          )}
+                        </div>
+                        {intervention.completion_notes ? (
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                            {intervention.completion_notes}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">Aucune note</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Departure/Arrival Events */}
+                    {eventsMap[intervention.id] && eventsMap[intervention.id].length > 0 && (
+                      <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                        <h4 className="text-xs font-medium text-primary mb-2 flex items-center gap-1.5">
+                          <Car className="w-3.5 h-3.5" />
+                          Chronologie
+                        </h4>
+                        <div className="space-y-1.5">
+                          {eventsMap[intervention.id].map(event => (
+                            <div key={event.id} className="flex items-center gap-2 text-xs">
+                              {event.event_type === 'departure' ? (
+                                <Car className="w-3 h-3 text-warning" />
+                              ) : (
+                                <Target className="w-3 h-3 text-success" />
+                              )}
+                              <span className={cn(
+                                "font-medium",
+                                event.event_type === 'departure' ? "text-warning" : "text-success"
+                              )}>
+                                {event.event_type === 'departure' ? 'Départ' : 'Arrivée'}
+                              </span>
+                              <span className="text-foreground">
+                                {event.profile?.full_name || 'Utilisateur'}
+                              </span>
+                              <span className="text-muted-foreground ml-auto">
+                                {format(new Date(event.created_at), 'HH:mm', { locale: fr })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
