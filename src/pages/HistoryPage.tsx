@@ -69,7 +69,7 @@ const getUrgencyConfig = (urgency: string) => {
 };
 
 const HistoryPage = () => {
-  const [startDate, setStartDate] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [endDate, setEndDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
