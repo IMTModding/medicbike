@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHistoryInterventions, useInterventionEvents } from '@/hooks/useInterventions';
@@ -21,7 +21,9 @@ import {
   Car,
   Target,
   FileText,
-  Edit3
+  Edit3,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
