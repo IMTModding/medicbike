@@ -265,8 +265,8 @@ const HistoryPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="container flex items-center justify-between h-16 px-4">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border pt-[env(safe-area-inset-top)]">
+        <div className="container flex items-center justify-between h-14 px-3">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => selectionMode ? cancelSelectionMode() : navigate('/')}
