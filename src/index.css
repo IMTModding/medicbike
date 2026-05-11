@@ -137,53 +137,50 @@
   }
 
   html {
-    /* Prevent iOS text size adjust after orientation change */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    /* Smooth scrolling - desktop only (smooth scroll harms native swipe inertia on mobile) */
     scroll-behavior: auto;
-    /* CRITICAL: Enable scrolling on html element */
-    overflow-y: scroll !important;
     overflow-x: hidden;
+    /* Let body be the scroll container; avoid double scroll on mobile */
   }
 
   @media (hover: hover) and (pointer: fine) {
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      overflow-y: scroll;
+    }
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    /* Fix for mobile browsers showing address bar */
     min-height: 100vh;
     min-height: 100dvh;
-    /* CRITICAL: Enable scrolling - use scroll instead of auto for better compatibility */
-    overflow-y: scroll !important;
     overflow-x: hidden;
-    /* Prevent tap highlight on Android */
     -webkit-tap-highlight-color: transparent;
-    /* Allow native vertical pan + pinch for smoothest swipe on iOS/Android */
-    touch-action: pan-y pinch-zoom;
   }
 
   /* Mobile-only restrictions */
   @media (hover: none) and (pointer: coarse) {
-    body {
-      /* Prevent pull-to-refresh on mobile */
-      overscroll-behavior-y: contain;
-      /* Prevent text selection on touch (mobile only) */
-      -webkit-user-select: none;
-      user-select: none;
-      /* Smooth touch scrolling (iOS momentum) */
+    html, body {
+      /* Single scroll container, native momentum */
+      overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      /* Allow native swipe in all directions to avoid stuck scroll */
+      touch-action: manipulation;
+      overscroll-behavior-y: auto;
     }
 
-    /* GPU-accelerate cards and interactive surfaces for smoother scroll */
+    body {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
     .card, [class*="rounded-"], button, a {
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* Reduce expensive backdrop blurs on mobile (major scroll jank source) */
+    /* Reduce expensive backdrop blurs on mobile */
     .backdrop-blur-sm,
     .backdrop-blur,
     .backdrop-blur-md,
@@ -195,19 +192,11 @@
       -webkit-backdrop-filter: none !important;
     }
 
-    /* Off-screen rendering optimization for long lists */
-    main > div,
-    main > section {
-      contain: content;
-    }
-
-    /* Promote sticky/fixed headers to their own layer */
     header {
       transform: translateZ(0);
       will-change: transform;
     }
 
-    /* Honor reduced motion */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.001ms !important;
