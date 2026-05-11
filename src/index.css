@@ -140,11 +140,15 @@
     /* Prevent iOS text size adjust after orientation change */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    /* Smooth scrolling */
-    scroll-behavior: smooth;
+    /* Smooth scrolling - desktop only (smooth scroll harms native swipe inertia on mobile) */
+    scroll-behavior: auto;
     /* CRITICAL: Enable scrolling on html element */
     overflow-y: scroll !important;
     overflow-x: hidden;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    html { scroll-behavior: smooth; }
   }
 
   body {
@@ -158,6 +162,8 @@
     overflow-x: hidden;
     /* Prevent tap highlight on Android */
     -webkit-tap-highlight-color: transparent;
+    /* Allow native vertical pan + pinch for smoothest swipe on iOS/Android */
+    touch-action: pan-y pinch-zoom;
   }
 
   /* Mobile-only restrictions */
@@ -168,8 +174,45 @@
       /* Prevent text selection on touch (mobile only) */
       -webkit-user-select: none;
       user-select: none;
-      /* Smooth touch scrolling */
+      /* Smooth touch scrolling (iOS momentum) */
       -webkit-overflow-scrolling: touch;
+    }
+
+    /* GPU-accelerate cards and interactive surfaces for smoother scroll */
+    .card, [class*="rounded-"], button, a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Reduce expensive backdrop blurs on mobile (major scroll jank source) */
+    .backdrop-blur-sm,
+    .backdrop-blur,
+    .backdrop-blur-md,
+    .backdrop-blur-lg,
+    .backdrop-blur-xl,
+    .backdrop-blur-2xl,
+    .backdrop-blur-3xl {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* Off-screen rendering optimization for long lists */
+    main > div,
+    main > section {
+      contain: content;
+    }
+
+    /* Promote sticky/fixed headers to their own layer */
+    header {
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    /* Honor reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+      }
     }
   }
 
